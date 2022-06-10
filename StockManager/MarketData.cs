@@ -12,184 +12,21 @@ using System.Text.Json.Serialization;
 namespace StockManager
 {
     public delegate void MarketDataNotify();                    // delegate
-
-    public class MarketData
+    
+    public partial class MarketData : IDataStoragable<MarketDataPreviousRetrievalsStore>
     {
         public event MarketDataNotify? StateChange;              // event
-
-        public class Settings
-        {
-            public class Store : StoreBase
-            {
-                public string? AlphaVantage_ApiKey { get; set; }
-                public int? AlphaVantage_MaxHitsPerMinute { get; set; }
-                public int? AlphaVantage_MaxHitsPerDay { get; set; }
-
-                public Store()
-                {
-                }
-
-                public override string GetFilename()
-                {
-                    return "Settings_MarketData";
-                }
-
-                public override string? GetFolderName()
-                {
-                    return null;
-                }
-
-                public override string GetPathPrefix()
-                {
-                    return Constants.APP_SETTINGS_FOLDER_NAME;
-                }
-            }
-
-            public string? ApiKey
-            {
-                get
-                {
-                    return store.Data.AlphaVantage_ApiKey;
-                }
-            }
-            public int? MaxHitsPerMinute
-            {
-                get
-                {
-                    return store.Data.AlphaVantage_MaxHitsPerMinute;
-                }
-            }
-            public int? MaxHitsPerDay
-            {
-                get
-                {
-                    return store.Data.AlphaVantage_MaxHitsPerDay;
-                }
-            }
-
-            private DataStorage<Store> store;
-
-            public Settings()
-            {
-                this.store = new DataStorage<Store>(new Store());
-                this.store.Load();
-            }
-
-        }
-
-        public class Logger
-        {
-            public class RequestRecord
-            {
-                public DateTime Date { get; set; }
-                public int Count { get; set; }
-
-            }
-
-            public class Store : StoreBase
-            {
-                public List<RequestRecord> RequestRecords { get; set; }
-
-                public Store()
-                {
-                    this.RequestRecords = new List<RequestRecord>();
-                }
-
-                public override string GetFilename()
-                {
-                    return "Logger_MarketData";
-                }
-
-                public override string? GetFolderName()
-                {
-                    return null;
-                }
-
-                public override string GetPathPrefix()
-                {
-                    return Constants.APP_SETTINGS_FOLDER_NAME;
-                }
-            }
-
-            public int TodaysCount
-            {
-                get
-                {
-                    return GetTodaysRequestRecord().Count;
-                }
-            }
-
-            private DataStorage<Store> store;
-
-            public Logger()
-            {
-                this.store = new DataStorage<Store>(new Store());
-                this.store.Load();
-            }
-
-            public void IncrementCount()
-            {
-                var requestRecord = GetTodaysRequestRecord();
-                requestRecord.Count++;
-                store.Save();
-            }
-
-            private RequestRecord GetTodaysRequestRecord()
-            {
-                DateTime today = DateTime.Today;
-                var requestRecord = store.Data.RequestRecords.Find(x => x.Date == today);
-                if (requestRecord == null)
-                {
-                    requestRecord = new RequestRecord()
-                    {
-                        Count = 0,
-                        Date = today
-                    };
-                    store.Data.RequestRecords.Add(requestRecord);
-                    store.Save();
-                }
-                return requestRecord;
-            }
-
-        }
-
-        public class Store : StoreBase
-        {
-            public List<Retrieval<TimeSerieseRequest, StockTimeSeries>> PreviousTimeSerieseRetrievals { get; set; }
-            public List<Retrieval<QuoteRequest, GlobalQuote>> PreviousQuoteRetrievals { get; set; }
-
-            [JsonConstructor]
-            public Store()
-            {
-                PreviousTimeSerieseRetrievals = new List<Retrieval<TimeSerieseRequest, StockTimeSeries>>();
-                PreviousQuoteRetrievals = new List<Retrieval<QuoteRequest, GlobalQuote>>();
-            }
-
-            public override string GetFilename()
-            {
-                return "PreviousRequests";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.MARKETDATA_REQUEST_FOLDER_NAME;
-            }
-        
-        }
 
         private const int MAX_ERRORS = 20;                      // This will change in the future if we buy a better package
 
         private static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         private static Task? minuteResetTask;
         private static Task? dailyResetTask;
-        private Settings settings;
-        private Logger logger;
-        private DataStorage<Store> store;
+        private MarketDataSettings settings;
+        private MarketDataLogger logger;
+
+        [JsonIgnore]
+        public DataStorage<MarketDataPreviousRetrievalsStore>? Store { get; set; }
 
         public int ActiveCallsCount { get; private set; }
         public int CallCountInMinute { get; private set; }
@@ -234,11 +71,11 @@ namespace StockManager
 
         public MarketData()
         {
-            this.settings = new Settings();
-            this.logger = new Logger();
+            this.settings = new MarketDataSettings();
+            this.logger = new MarketDataLogger();
 
-            this.store = new DataStorage<Store>(new Store());
-            this.store.Load();
+            this.Store = new DataStorage<MarketDataPreviousRetrievalsStore>(new MarketDataPreviousRetrievalsStore());
+            this.Store.Load();
         }
 
         public async Task GetCompanyListings(MarketDataRequest<CompanyListingsRequest, string> marketDataRequest)
@@ -301,14 +138,14 @@ namespace StockManager
                     var result = await stocksClient.GetGlobalQuoteAsync(marketDataRequest.Requesting.Symbol);
                     marketDataRequest.SetResult(result);
 
-                    // Store this result for future recalls
+                    // MarketDataSettingsStore this result for future recalls
                     var retrieval = new Retrieval<QuoteRequest, GlobalQuote>(
                         marketDataRequest.Requesting,
                         marketDataRequest.Resulting,
                         GetValidUntil(),
                         marketDataRequest.RecordId);
-                    store.Data.PreviousQuoteRetrievals.Add(retrieval);
-                    store.Save();
+                    Store.Data.PreviousQuoteRetrievals.Add(retrieval);
+                    Store.Save();
                 });
                 await DoRequest(marketDataRequest, taskAction);
             }
@@ -320,7 +157,7 @@ namespace StockManager
             // 13:07 Now
             DateTime now = DateTime.Now;
 
-            var retrieval = store.Data.PreviousQuoteRetrievals.Find(x =>
+            var retrieval = Store.Data.PreviousQuoteRetrievals.Find(x =>
                 x.Requesting?.Symbol == request.Symbol &&
                 x.ValidUntil > now);
 
@@ -329,7 +166,7 @@ namespace StockManager
 
         public Retrieval<QuoteRequest, GlobalQuote>? GetQuoteRetrieval(Guid recordId)
         {
-            return (Retrieval<QuoteRequest, GlobalQuote>?)store.Data.PreviousQuoteRetrievals.Find(x => x.RecordId == recordId);
+            return (Retrieval<QuoteRequest, GlobalQuote>?)Store.Data.PreviousQuoteRetrievals.Find(x => x.RecordId == recordId);
         }
 
         public async Task GetTimeSeries(MarketDataRequest<TimeSerieseRequest, StockTimeSeries> marketDataRequest)
@@ -359,14 +196,14 @@ namespace StockManager
                             isAdjusted: false);
                         marketDataRequest.SetResult(result);
 
-                        // Store this result for future recalls
+                        // MarketDataSettingsStore this result for future recalls
                         var retrieval = new Retrieval<TimeSerieseRequest, StockTimeSeries>(
                             marketDataRequest.Requesting,
                             marketDataRequest.Resulting,
                             GetValidUntil(marketDataRequest.Requesting.Interval),
                             marketDataRequest.RecordId);
-                        store.Data.PreviousTimeSerieseRetrievals.Add(retrieval);
-                        store.Save();
+                        Store.Data.PreviousTimeSerieseRetrievals.Add(retrieval);
+                        Store.Save();
                     });
                     await DoRequest(marketDataRequest, taskAction);
                 }
@@ -379,7 +216,7 @@ namespace StockManager
             // 13:07 Now
             DateTime now = DateTime.Now;
 
-            var retrieval = store.Data.PreviousTimeSerieseRetrievals.Find(x =>
+            var retrieval = Store.Data.PreviousTimeSerieseRetrievals.Find(x =>
                 x.Requesting?.Symbol == request.Symbol &&
                 x.Requesting.Interval == request.Interval &&
                 x.ValidUntil > now);
@@ -389,7 +226,7 @@ namespace StockManager
 
         public Retrieval<TimeSerieseRequest, StockTimeSeries>? GetTimeSeriesRetrieval(Guid recordId)
         {
-            return (Retrieval<TimeSerieseRequest, StockTimeSeries>?)store.Data.PreviousTimeSerieseRetrievals.Find(x => x.RecordId == recordId);
+            return (Retrieval<TimeSerieseRequest, StockTimeSeries>?)Store.Data.PreviousTimeSerieseRetrievals.Find(x => x.RecordId == recordId);
         }
 
         public int GetWhenNextReady()
@@ -400,29 +237,29 @@ namespace StockManager
         
         public async Task ClearAllPreviousRetrievals()
         {
-            await store.CleanAsync(new List<Guid>());
+            await Store.CleanAsync(new List<Guid>());
 
-            store.Data.PreviousQuoteRetrievals.Clear();
-            store.Data.PreviousTimeSerieseRetrievals.Clear();
-            store.Save();
+            Store.Data.PreviousQuoteRetrievals.Clear();
+            Store.Data.PreviousTimeSerieseRetrievals.Clear();
+            Store.Save();
         }
 
         public async Task ClearPreviousQuoteRetrievals()
         {
-            List<Guid> currentIds = store.Data.PreviousTimeSerieseRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
-            await store.CleanAsync(currentIds);
+            List<Guid> currentIds = Store.Data.PreviousTimeSerieseRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
+            await Store.CleanAsync(currentIds);
 
-            store.Data.PreviousQuoteRetrievals.Clear();
-            store.Save();
+            Store.Data.PreviousQuoteRetrievals.Clear();
+            Store.Save();
         }
 
         public async Task ClearPreviousTimeSeriesRetrievals()
         {
-            List<Guid> currentIds = store.Data.PreviousQuoteRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
-            await store.CleanAsync(currentIds);
+            List<Guid> currentIds = Store.Data.PreviousQuoteRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
+            await Store.CleanAsync(currentIds);
 
-            store.Data.PreviousTimeSerieseRetrievals.Clear();
-            store.Save();
+            Store.Data.PreviousTimeSerieseRetrievals.Clear();
+            Store.Save();
         }
 
         public async Task PauseRequest()
@@ -649,6 +486,9 @@ namespace StockManager
             }
         }
 
-
+        public void Destroy()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

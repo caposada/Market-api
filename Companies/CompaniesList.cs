@@ -2,11 +2,12 @@
 using Elements;
 using StockManager;
 using System.Globalization;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace Companies
 {
-    public class CompaniesList
+    public class CompaniesList : IDataStoragable<CompaniesListStore>
     {
         internal class Csv
         {
@@ -37,56 +38,33 @@ namespace Companies
             }
         }
 
-        public class Store : StoreBase
-        {
-            public List<SimpleCompany>? Companies { get; set; }
-
-            public Store()
-            {
-                this.Companies = new List<SimpleCompany>();
-            }
-
-            public override string GetFilename()
-            {
-                return "CompaniesList";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.COMPANIES_FOLDER_NAME;
-            }
-        }
-
         private const int MIN_COMPANY_NAME_SIZE = 4;
 
         public List<SimpleCompany>? Companies
         {
             get
             {
-                return store.Data.Companies;
+                return Store.Data.Companies;
             }
         }
         public bool Loaded
         {
             get
             {
-                return store != null && store.Data.Companies != null && store.Data.Companies.Count > 0;
+                return Store != null && Store.Data.Companies != null && Store.Data.Companies.Count > 0;
             }
         }
 
-        private DataStorage<Store> store;
+        [JsonIgnore]
+        public DataStorage<CompaniesListStore>? Store { get; set; }
+
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         private MarketData marketData;
 
         public CompaniesList(MarketData marketData)
         {
             this.marketData = marketData;
-            this.store = new DataStorage<Store>(new Store());
+            this.Store = new DataStorage<CompaniesListStore>(new CompaniesListStore());
         }
 
         public async Task LoadAsync()
@@ -94,7 +72,7 @@ namespace Companies
             ColourConsole.WriteInfo($"Loading CompanyList ...");
 
             // Load data file
-            this.store.Load();
+            this.Store.Load();
 
             if (!Loaded)
             {
@@ -112,10 +90,10 @@ namespace Companies
                     // Extract data from CSV data dowloaded 
                     if (marketDataRequest.Resulting != null)
                     {
-                        store.Data.Companies = ExtractDataFromDataString(marketDataRequest.Resulting);
+                        Store.Data.Companies = ExtractDataFromDataString(marketDataRequest.Resulting);
 
                         // Save to data file
-                        store.Save();
+                        Store.Save();
 
                         ColourConsole.WriteInfo($"... CompanyList from market retrieved and saved to data file.");
                     }
@@ -127,15 +105,15 @@ namespace Companies
 
         public List<SimpleCompany>? GetCompanies()
         {
-            return store.Data.Companies;
+            return Store.Data.Companies;
         }
 
         public List<string> GetFlatList()
         {
             List<string> flatlist = new List<string>();
-            if (store.Data.Companies != null)
+            if (Store.Data.Companies != null)
             {
-                foreach (var company in store.Data.Companies)
+                foreach (var company in Store.Data.Companies)
                 {
                     flatlist.Add(company.LongName);
 
@@ -156,9 +134,9 @@ namespace Companies
         public SimpleCompany? GetCompany(string text)
         {
             SimpleCompany? company = null;
-            if (store.Data.Companies != null)
+            if (Store.Data.Companies != null)
             {
-                company = store.Data.Companies.Find(
+                company = Store.Data.Companies.Find(
                     x => (x.Name != null && x.Name.Equals(text, StringComparison.CurrentCultureIgnoreCase)) || x.Aliases.Contains(text) || x.Symbol == text);
             }
             return company;
@@ -166,11 +144,11 @@ namespace Companies
 
         public List<SimpleCompany> GetCompaniesFromFragment(string text)
         {
-            if (store.Data.Companies != null)
+            if (Store.Data.Companies != null)
             {
                 List<SimpleCompany> companies = new List<SimpleCompany>();
-                companies.AddRange(store.Data.Companies.FindAll(x => x.Name != null && x.Name.Contains(text)));
-                companies.AddRange(store.Data.Companies.FindAll(x => x.Aliases.Contains(text)));
+                companies.AddRange(Store.Data.Companies.FindAll(x => x.Name != null && x.Name.Contains(text)));
+                companies.AddRange(Store.Data.Companies.FindAll(x => x.Aliases.Contains(text)));
                 return companies;
             }
             return new List<SimpleCompany>();
@@ -178,22 +156,22 @@ namespace Companies
 
         public SimpleCompany? GetCompanyBySymbol(string symbol)
         {
-            if (store.Data.Companies != null)
-                return store.Data.Companies.Find(x => x.Symbol == symbol);
+            if (Store.Data.Companies != null)
+                return Store.Data.Companies.Find(x => x.Symbol == symbol);
             return null;
         }
 
         public SimpleCompany? GetCompanyByName(string text)
         {
-            if (store.Data.Companies != null)
-                return store.Data.Companies.Find(x => x.Name == text);
+            if (Store.Data.Companies != null)
+                return Store.Data.Companies.Find(x => x.Name == text);
             return null;
         }
 
         public List<SimpleCompany>? GetCompanies(Regex pattern)
         {
-            if (store.Data.Companies != null)
-                return store.Data.Companies.Where(x => x.Name != null && pattern.IsMatch(x.Name)).ToList();
+            if (Store.Data.Companies != null)
+                return Store.Data.Companies.Where(x => x.Name != null && pattern.IsMatch(x.Name)).ToList();
             return null;
         }
 
@@ -257,6 +235,11 @@ namespace Companies
             }
 
             return firstWord;
+        }
+
+        public void Destroy()
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -1,37 +1,15 @@
 ﻿using Elements;
+using System.Text.Json.Serialization;
 using Tweetinvi;
 using Tweetinvi.Models;
 
 namespace TwitterFeedReader
-{
-    public class TwitterFeed : NewsFeed
-    {
-        public class Store : StoreBase
-        {
-            public string? Twitter_ApiKey { get; set; }
-            public string? Twitter_ApiKeySecret { get; set; }
-            public string? Twitter_AccessToken { get; set; }
-            public string? Twitter_AccessTokenSecret { get; set; }
+{   
+    public class TwitterFeed : NewsFeed, IDataStoragable<TwitterSettingsStore>
+    {        
 
-            public Store()
-            {
-            }
-
-            public override string GetFilename()
-            {
-                return "Settings_Twitter";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.APP_SETTINGS_FOLDER_NAME;
-            }
-        }
+        [JsonIgnore]
+        public DataStorage<TwitterSettingsStore>? Store { get; set; }
 
         private static TwitterClient? userClient;
         private IUser? user = null;
@@ -73,14 +51,19 @@ namespace TwitterFeedReader
         {
             if (userClient == null)
             {
-                DataStorage<Store> store = new DataStorage<Store>(new Store());
-                store.Load();
+                Store = new DataStorage<TwitterSettingsStore>(new TwitterSettingsStore());
+                Store.Load();
                 userClient = new TwitterClient(
-                    store.Data.Twitter_ApiKey,
-                    store.Data.Twitter_ApiKeySecret,
-                    store.Data.Twitter_AccessToken,
-                    store.Data.Twitter_AccessTokenSecret);
+                    Store.Data.Twitter_ApiKey,
+                    Store.Data.Twitter_ApiKeySecret,
+                    Store.Data.Twitter_AccessToken,
+                    Store.Data.Twitter_AccessTokenSecret);
             }
+        }
+
+        public void Destroy()
+        {
+            throw new NotImplementedException();
         }
     }
 }

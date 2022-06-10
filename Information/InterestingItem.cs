@@ -8,53 +8,19 @@ using TextAnalysis;
 namespace Information
 {
     public delegate void InterestingItemsNotify(InterestingItem interestingItem);                               // delegate
-
-    public class InterestingItem : GathererInformationItem
+    
+    public class InterestingItem : GathererInformationItem, IDataStoragable<FindingsStore>
     {
         private const int NUMBER_OF_DAYS_IN_THE_PAST = 10;
 
         public event InterestingItemsNotify? AllTimeSeriesDataProcessed;             // event
-
-        public class Store : StoreBase
-        {
-            public string? Text { get; set; }
-            public DateTimeOffset PublishDate { get; set; }
-            public ExchangeState StockExchangeState { get; set; }
-            public List<AnalysisFinding>? Findings { get; set; }
-
-            private string? folderName;
-
-            public Store()
-            {
-            }
-
-            public Store(string folderName)
-            {
-                this.folderName = folderName;
-            }
-
-            public override string GetFilename()
-            {
-                return "Findings";
-            }
-
-            public override string? GetFolderName()
-            {
-                return folderName;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.GATHERER_FOLDER_NAME;
-            }
-        }
-
+         
         [JsonIgnore]
         public string? Text
         {
             get
             {
-                return store.Data.Text;
+                return Store.Data.Text;
             }
         }
         [JsonIgnore]
@@ -62,7 +28,7 @@ namespace Information
         {
             get
             {
-                return store.Data.PublishDate;
+                return Store.Data.PublishDate;
             }
         }
         [JsonIgnore]
@@ -70,7 +36,7 @@ namespace Information
         {
             get
             {
-                return store.Data.Findings;
+                return Store.Data.Findings;
             }
         }
         [JsonIgnore]
@@ -117,7 +83,9 @@ namespace Information
         }
         public TimeSeriesStatus TimeSeriesStatus { get; set; }
 
-        private DataStorage<Store> store;
+        [JsonIgnore]
+        public DataStorage<FindingsStore>? Store { get; set; }
+
         private BreakDown? breakdown;
         private TimeSeriesData? timeSeriesData;
         private static StockExchange stockExchange = new NYSE();
@@ -127,18 +95,18 @@ namespace Information
         public InterestingItem(Guid id, Guid sourceId, DateTime timestamp)
             : base(id, sourceId, timestamp)
         {
-            store = new DataStorage<Store>(new Store(this.Id.ToString()));
-            store.Load();
+            Store = new DataStorage<FindingsStore>(new FindingsStore(this.Id.ToString()));
+            Store.Load();
         }
 
         public InterestingItem(AnalysisInfo info)
             : base(info.NewsItem.Id, info.NewsItem.SourceId, DateTime.Now)
         {
-            store = new DataStorage<Store>(new Store(this.Id.ToString()));
-            store.Data.Text = info.Text;
-            store.Data.PublishDate = info.NewsItem.PublishDate;
-            store.Data.Findings = info.Findings;
-            store.Save();
+            Store = new DataStorage<FindingsStore>(new FindingsStore(this.Id.ToString()));
+            Store.Data.Text = info.Text;
+            Store.Data.PublishDate = info.NewsItem.PublishDate;
+            Store.Data.Findings = info.Findings;
+            Store.Save();
 
             breakdown = new BreakDown(this.Id);
             breakdown.AnalysisBreakDown = info.BreakDown;
@@ -148,7 +116,7 @@ namespace Information
 
         public void Destroy()
         {
-
+            throw new NotImplementedException();
         }
 
         public List<MarketDataRequestAction>? GetMarketDataRequestActions(MarketData marketData)

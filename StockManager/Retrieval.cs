@@ -2,42 +2,12 @@
 using System.Text.Json.Serialization;
 
 namespace StockManager
-{
-    public class Retrieval<Request, Result> : BaseRetrieval
-    {
+{   
+    public class Retrieval<Request, Result> : BaseRetrieval, IDataStoragable<ResultStore<Result>>
+    {        
 
-        public class Store : StoreBase
-        {
-            public Result? Result { get; set; }
-
-            private string? folderName;
-
-            public Store()
-            {
-            }
-
-            public Store(string? folderName)
-            {
-                this.folderName = folderName;
-            }
-
-            public override string GetFilename()
-            {
-                return "Result";
-            }
-
-            public override string? GetFolderName()
-            {
-                return folderName;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.MARKETDATA_REQUEST_FOLDER_NAME;
-            }
-        }
-
-        private DataStorage<Store>? store;
+        [JsonIgnore]
+        public DataStorage<ResultStore<Result>>? Store { get; set; }
 
         public Request? Requesting { get; set; }
 
@@ -53,21 +23,25 @@ namespace StockManager
             this.Requesting = requesting;
             this.ValidUntil = validUntil;
 
-            this.store = new DataStorage<Store>(new Store(RecordId.ToString()));
-            this.store.Data.Result = resulting;
-            this.store.Save();
+            this.Store = new DataStorage<ResultStore<Result>>(new ResultStore<Result>(RecordId.ToString()));
+            this.Store.Data.Result = resulting;
+            this.Store.Save();
         }
 
         public Result? GetResult()
         {
-            if (store == null)
-                store = new DataStorage<Store>(new Store(RecordId.ToString()));
+            if (Store == null)
+                Store = new DataStorage<ResultStore<Result>>(new ResultStore<Result>(RecordId.ToString()));
 
-            if (store.Data.Result == null)
-                store.Load();
+            if (Store.Data.Result == null)
+                Store.Load();
 
-            return store.Data.Result;
+            return Store.Data.Result;
         }
 
+        public void Destroy()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

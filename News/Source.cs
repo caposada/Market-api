@@ -6,7 +6,6 @@ using TwitterFeedReader;
 namespace News
 {
     
-
     public class Source
     {
         public delegate void SourceMonitorNotify(Guid id, string eventName);            // delegate

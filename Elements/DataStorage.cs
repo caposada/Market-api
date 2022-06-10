@@ -1,28 +1,5 @@
 ﻿namespace Elements
-{
-
-    public interface IDataStoragable<T> where T : new()
-    {
-        public DataStorage<T>? Store { get; set; }
-
-        public abstract void Destroy();
-
-    }
-
-    public class DataStorageBase<T> where T : StoreBase
-    {
-        public string? FileName { get; set; }
-        public string? FolderName { get; set; }
-        public string? PathPrefix { get; set; }
-
-        public DataStorageBase(T store)
-        {
-            this.FileName = store.GetFilename();
-            this.FolderName = store.GetFolderName();
-            this.PathPrefix = store.GetPathPrefix();
-        }
-    }
-
+{    
     public class DataStorage<T> : DataStorageBase<StoreBase> where T : new()
     {
         public T Data { get; set; }
@@ -89,7 +66,7 @@
 
         protected string GetPath()
         {
-            string subPathFoldername = subFoldername ?? typeof(T).Name;
+            string subPathFoldername = subFoldername ?? "Store";
             return PathPrefix
                 + subPathFoldername
                 + "/"
@@ -102,6 +79,5 @@
         }
 
     }
-
 
 }

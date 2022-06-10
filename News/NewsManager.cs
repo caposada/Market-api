@@ -1,11 +1,12 @@
 ﻿using Elements;
+using System.Text.Json.Serialization;
 using static News.Source;
 
 namespace News
 {
 
     // This runs on its own, plodding away
-    public class NewsManager
+    public class NewsManager : IDataStoragable<SourcesStore>
     {
         public delegate void NewsManagerNotify(Guid id);                  // delegate
 
@@ -14,102 +15,52 @@ namespace News
         public event FeedFreshArrival? FreshArrivals;                    // event
         public event SourceMonitorNotify? SourceMonitorChanged;          // event
 
-        public class Settings
-        {
-            public class StandardNewsSource
-            {
-                public string? Timezone { get; set; }
-                public FeedType FeedType { get; set; }
-                public string FeedTitle { get; set; }
-                public string FeedUrl { get; set; }
-            }
+        public class Settings : IDataStoragable<NewsManagerSettingsStore>
+        {            
 
-            public class Store : StoreBase
-            {
-                public List<StandardNewsSource> StandardNewsSources { get; set; }
-
-                public Store()
-                {
-                }
-
-                public override string GetFilename()
-                {
-                    return "Settings_NewsManager";
-                }
-
-                public override string? GetFolderName()
-                {
-                    return null;
-                }
-
-                public override string GetPathPrefix()
-                {
-                    return Constants.APP_SETTINGS_FOLDER_NAME;
-                }
-            }
-
-            public List<StandardNewsSource> StandardNewsSources
+            public List<NewsManagerSettingsStore.StandardNewsSource> StandardNewsSources
             {
                 get
                 {
-                    return store.Data.StandardNewsSources;
+                    return Store.Data.StandardNewsSources;
                 }
             }
 
-            private DataStorage<Store> store;
+            [JsonIgnore]
+            public DataStorage<NewsManagerSettingsStore>? Store { get; set; }
 
             public Settings()
             {
-                this.store = new DataStorage<Store>(new Store());
-                this.store.Load();
+                this.Store = new DataStorage<NewsManagerSettingsStore>(new NewsManagerSettingsStore());
+                this.Store.Load();
             }
 
-        }
-
-        public class Store : StoreBase
-        {
-
-            public List<Source> Sources { get; set; }
-
-            public Store()
+            public void Destroy()
             {
-                this.Sources = new List<Source>();
-            }
-
-            public override string GetFilename()
-            {
-                return "Sources";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.FEED_FOLDER_NAME;
+                throw new NotImplementedException();
             }
         }
+            
+        [JsonIgnore]
+        public DataStorage<SourcesStore>? Store { get; set; }
 
         public List<Source> Sources
         {
             get
             {
-                return store.Data.Sources;
+                return Store.Data.Sources;
             }
         }
 
-        private DataStorage<Store> store;
         private Settings settings;
 
         public NewsManager()
         {
-            this.store = new DataStorage<Store>(new Store());
-            this.store.Load();
+            this.Store = new DataStorage<SourcesStore>(new SourcesStore());
+            this.Store.Load();
 
             // Add event watching for every feed
-            foreach (Source source in this.store.Data.Sources)
+            foreach (Source source in this.Store.Data.Sources)
             {
                 source.Load();
                 source.SourceMonitorChanged += Source_SourceMonitorChanged; // Watch for general changes (event)
@@ -119,7 +70,7 @@ namespace News
 
         public void SaveChanges()
         {
-            store.Save();
+            Store.Save();
         }
 
         public string? GetSourceFeedTitle(Guid id)
@@ -137,7 +88,7 @@ namespace News
 
         public void AddFeed(FeedType feedType, string title, string url, string timezone)
         {
-            if (!store.Data.Sources.Any(x => x.FeedTitle == title || x.FeedUrl == url))
+            if (!Store.Data.Sources.Any(x => x.FeedTitle == title || x.FeedUrl == url))
             {
                 Source source = new Source(
                     feedType,
@@ -147,7 +98,7 @@ namespace News
                 source.SourceMonitorChanged += Source_SourceMonitorChanged; // Watch for general changes (event)
                 source.FreshArrivals += Source_FreshArrivals;               //Watch for new NewsItems(event)
                 Sources.Add(source);
-                store.Save();
+                Store.Save();
 
                 Added?.Invoke(source.Id);
             }
@@ -166,7 +117,7 @@ namespace News
             source.Destroy();
 
             Sources.Remove(source);
-            store.Save();
+            Store.Save();
 
             Removed?.Invoke(source.Id);
         }
@@ -180,11 +131,11 @@ namespace News
             }
         }
 
-        // Temp - shouldn't be needed (keep an eye on the feeds/Store folder for GUID folders that don't belong anymore)
+        // Temp - shouldn't be needed (keep an eye on the feeds/NewsManagerSettingsStore folder for GUID folders that don't belong anymore)
         public async Task CleanAsync()
         {
             List<Guid> currentIds = Sources.Select(x => x.Id).ToList();
-            await store.CleanAsync(currentIds);
+            await Store.CleanAsync(currentIds);
         }
 
         public void CheckMissingFeeds()
@@ -224,6 +175,10 @@ namespace News
             FreshArrivals?.Invoke(id, freshNewsItems);
         }
 
+        public void Destroy()
+        {
+            throw new NotImplementedException();
+        }
     }
 
 }

@@ -1,41 +1,11 @@
 ﻿using Elements;
+using System.Text.Json.Serialization;
 
 namespace Information
-{
+{    
 
-    public class TimeSeriesData
+    public class TimeSeriesData : IDataStoragable<TimeSeriesesStore>
     {
-        public class Store : StoreBase
-        {
-            public List<StockTimeSeriesResult>? StockTimeSeriesResults { get; set; }
-
-            private string folderName;
-
-            public Store()
-            {
-            }
-
-            public Store(string folderName)
-            {
-                this.folderName = folderName;
-            }
-
-            public override string GetFilename()
-            {
-                return "TimeSerieses";
-            }
-
-            public override string GetFolderName()
-            {
-                return folderName;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.GATHERER_FOLDER_NAME;
-            }
-        }
-
         public Guid Id { get; set; }
         public List<TimeSeries> TimeSerieses
         {
@@ -44,14 +14,14 @@ namespace Information
                 if (timeSerieses != null)
                     return timeSerieses;
 
-                if (store.Data.StockTimeSeriesResults == null)
-                    store.Load();
+                if (Store.Data.StockTimeSeriesResults == null)
+                    Store.Load();
 
-                if (store.Data.StockTimeSeriesResults == null)
-                    store.Data.StockTimeSeriesResults = new List<StockTimeSeriesResult>();
+                if (Store.Data.StockTimeSeriesResults == null)
+                    Store.Data.StockTimeSeriesResults = new List<StockTimeSeriesResult>();
 
                 timeSerieses = new List<TimeSeries>();
-                foreach (var stockTimeSeriesResult in store.Data.StockTimeSeriesResults)
+                foreach (var stockTimeSeriesResult in Store.Data.StockTimeSeriesResults)
                 {
                     AddTimeSeries(stockTimeSeriesResult);
                 }
@@ -62,31 +32,33 @@ namespace Information
         {
             get
             {
-                return store.Exists();
+                return Store.Exists();
             }
         }
         public DateTimeOffset PublishedDate { get; private set; }
 
-        private DataStorage<Store> store;
+        [JsonIgnore]
+        public DataStorage<TimeSeriesesStore>? Store { get; set; }
+
         private List<TimeSeries> timeSerieses;
 
         public TimeSeriesData(Guid id, DateTimeOffset publishedDate)
         {
             this.PublishedDate = publishedDate;
             this.Id = id;
-            store = new DataStorage<Store>(new Store(this.Id.ToString()));
+            Store = new DataStorage<TimeSeriesesStore>(new TimeSeriesesStore(this.Id.ToString()));
         }
 
         public void Add(StockTimeSeriesResult stockTimeSeriesResult)
         {
-            if (store.Data.StockTimeSeriesResults == null)
-                store.Load();
+            if (Store.Data.StockTimeSeriesResults == null)
+                Store.Load();
 
-            if (store.Data.StockTimeSeriesResults == null)
-                store.Data.StockTimeSeriesResults = new List<StockTimeSeriesResult>();
+            if (Store.Data.StockTimeSeriesResults == null)
+                Store.Data.StockTimeSeriesResults = new List<StockTimeSeriesResult>();
 
-            store.Data.StockTimeSeriesResults.Add(stockTimeSeriesResult);
-            store.Save();
+            Store.Data.StockTimeSeriesResults.Add(stockTimeSeriesResult);
+            Store.Save();
 
             AddTimeSeries(stockTimeSeriesResult);
         }
@@ -97,6 +69,11 @@ namespace Information
             timeSeries.ParseData();
             timeSerieses.Add(timeSeries);
 
+        }
+
+        public void Destroy()
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -7,86 +7,58 @@ namespace Information
 {
     public delegate void GathererInterestingItemNotify(GathererInformationItem interestingItem);    // delegate
     public delegate void InformationNotify();                                                       // delegate
-
-    public class GathererInformation
+      
+    public class GathererInformation : IDataStoragable<GathererInformationStore>
     {
         public event GathererInterestingItemNotify? InterestedItemAdded;                            // event
         public event GathererInterestingItemNotify? InterestedItemRemoved;                          // event
         public event GathererInterestingItemNotify? NoninterestedItemAdded;                         // event
         public event InformationNotify? InformationChanged;                                         // event
-
-        public class Store : StoreBase
-        {
-            public List<InterestingItem> InterestingItems { get; set; }
-            public List<NonInterestingItem> NonInterestingItems { get; set; }
-            public DateTime LatestDate { get; set; }
-
-            public Store()
-            {
-                this.InterestingItems = new List<InterestingItem>();
-                this.NonInterestingItems = new List<NonInterestingItem>();
-                this.LatestDate = DateTime.MinValue;
-            }
-
-            public override string GetFilename()
-            {
-                return "Information";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.GATHERER_FOLDER_NAME;
-            }
-        }
-
+        
         private const int MIN_AVAILABILITY = 0; // 0 to 4
 
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         private AsyncronousQueueProcessor requestQueueProcessor;
         private Task? requestsTask;
-        private DataStorage<Store> store;
         private CancellationToken periodicCheckCancellationToken = new CancellationToken();
 
         public List<InterestingItem> InterestingItems
         {
             get
             {
-                return store.Data.InterestingItems;
+                return Store.Data.InterestingItems;
             }
         }
         public List<NonInterestingItem> NonInterestingItems
         {
             get
             {
-                return store.Data.NonInterestingItems;
+                return Store.Data.NonInterestingItems;
             }
         }
         public DateTime LatestDate
         {
             get
             {
-                return store.Data.LatestDate;
+                return Store.Data.LatestDate;
             }
             set
             {
-                store.Data.LatestDate = value;
-                store.Save();
+                Store.Data.LatestDate = value;
+                Store.Save();
             }
         }
 
         [JsonIgnore]
         public MarketData MarketData { get; set; }
+        [JsonIgnore]
+        public DataStorage<GathererInformationStore>? Store { get; set; }
 
         [JsonConstructorAttribute]
         public GathererInformation(MarketData marketData)
         {
-            store = new DataStorage<Store>(new Store());
-            store.Load();
+            Store = new DataStorage<GathererInformationStore>(new GathererInformationStore());
+            Store.Load();
 
             this.MarketData = marketData;
             this.requestQueueProcessor = new AsyncronousQueueProcessor();
@@ -97,11 +69,11 @@ namespace Information
             //_ = HouseKeeping();
         }
 
-        // Temp - shouldn't be needed (keep an eye on the feeds/Store folder for GUID folders that don't belong anymore)
+        // Temp - shouldn't be needed (keep an eye on the feeds/CompaniesAliasListStore folder for GUID folders that don't belong anymore)
         public async Task CleanAsync()
         {
             List<Guid> currentIds = InterestingItems.Select(x => x.Id).ToList();
-            await store.CleanAsync(currentIds);
+            await Store.CleanAsync(currentIds);
         }
 
         public async Task HouseKeeping()
@@ -140,7 +112,7 @@ namespace Information
                 InterestingItems.Remove(found);
                 InterestedItemRemoved?.Invoke(found);
 
-                store.Save();
+                Store.Save();
 
                 return true;
             }
@@ -152,7 +124,7 @@ namespace Information
             var item = new InterestingItem(info);
             item.AllTimeSeriesDataProcessed += InterestingItem_AllTimeSeriesDataProcessed;
             InterestingItems.Add(item);
-            store.Save();
+            Store.Save();
             InterestedItemAdded?.Invoke(item);
 
             _ = QueueMarketDataRequests(item);
@@ -162,7 +134,7 @@ namespace Information
         {
             var item = new NonInterestingItem(info);
             NonInterestingItems.Add(item);
-            store.Save();
+            Store.Save();
             NoninterestedItemAdded?.Invoke(item);
         }
 
@@ -180,7 +152,7 @@ namespace Information
                 }
             }
             if (atLeastOne)
-                store.Save();
+                Store.Save();
         }
 
         private void InterestingItem_AllTimeSeriesDataProcessed(InterestingItem interestingItem)
@@ -196,7 +168,7 @@ namespace Information
                 // The InterestingItem has all it's TimeSeriesData now, so inform
                 // the Gatherer to save the Information
                 InformationChanged?.Invoke();
-                store.Save();
+                Store.Save();
             }
         }
 
@@ -261,6 +233,10 @@ namespace Information
             }
         }
 
+        public void Destroy()
+        {
+            throw new NotImplementedException();
+        }
     }
 
 }

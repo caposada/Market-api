@@ -23,7 +23,7 @@ namespace StockManager
         {
             this.marketData = marketData;
 
-            //this.store = new DataStorage<Store>(new Store());
+            //this.store = new DataStorage<MarketDataSettingsStore>(new MarketDataSettingsStore());
             //store.Load();
 
             requestQueueProcessor.Added += (Action action) =>

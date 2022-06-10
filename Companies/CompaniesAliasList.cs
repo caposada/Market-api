@@ -1,64 +1,41 @@
 ﻿using Elements;
+using System.Text.Json.Serialization;
 
 namespace Companies
 {
-    public class CompaniesAliasList
-    {
-
-        public class Store : StoreBase
-        {
-            public List<CompanyAlias> Aliases { get; set; }
-
-            public Store()
-            {
-                this.Aliases = new List<CompanyAlias>();
-            }
-
-            public override string GetFilename()
-            {
-                return "CompaniesAliasList";
-            }
-
-            public override string? GetFolderName()
-            {
-                return null;
-            }
-
-            public override string GetPathPrefix()
-            {
-                return Constants.COMPANIES_FOLDER_NAME;
-            }
-        }
+    public class CompaniesAliasList : IDataStoragable<CompaniesAliasListStore>
+    {        
 
         public List<CompanyAlias> Aliases
         {
             get
             {
-                return store.Data.Aliases;
+                return Store.Data.Aliases;
             }
         }
 
-        private DataStorage<Store> store;
+        [JsonIgnore]
+        public DataStorage<CompaniesAliasListStore>? Store { get; set; }
 
         public CompaniesAliasList()
         {
-            this.store = new DataStorage<Store>(new Store());
-            this.store.Load();
+            this.Store = new DataStorage<CompaniesAliasListStore>(new CompaniesAliasListStore());
+            this.Store.Load();
         }
 
         public CompanyAlias SetAlias(string symbol, List<string> aliases)
         {
-            CompanyAlias? alias = store.Data.Aliases.Find(x => x.Symbol == symbol);
+            CompanyAlias? alias = Store.Data.Aliases.Find(x => x.Symbol == symbol);
             if (alias != null)
             {
                 alias.Names = aliases;
-                this.store.Save();
+                this.Store.Save();
             }
             else
             {
                 alias = new CompanyAlias(symbol, aliases);
-                this.store.Data.Aliases.Add(alias);
-                this.store.Save();
+                this.Store.Data.Aliases.Add(alias);
+                this.Store.Save();
             }
             return alias;
         }
@@ -66,12 +43,16 @@ namespace Companies
         public List<string> GetAllAliases()
         {
             List<string> aliases = new List<string>();
-            foreach (var alias in store.Data.Aliases)
+            foreach (var alias in Store.Data.Aliases)
             {
                 aliases.AddRange(alias.Names);
             }
             return aliases;
         }
 
+        public void Destroy()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

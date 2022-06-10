@@ -1,40 +1,10 @@
 ﻿using Elements;
+using System.Text.Json.Serialization;
 
 namespace News
 {
 
-    public class SourceMonitorStore : StoreBase
-    {
-        public TimeSpan PollingTimespan { get; set; } = Constants.DEFAULT_POLLING_PERIOD;
-
-        private string? folderName;
-
-        public SourceMonitorStore()
-        {
-        }
-
-        public SourceMonitorStore(string? folderName)
-        {
-            this.folderName = folderName;
-        }
-
-        public override string GetFilename()
-        {
-            return "Settings_SourceMonitor";
-        }
-
-        public override string? GetFolderName()
-        {
-            return folderName;
-        }
-
-        public override string GetPathPrefix()
-        {
-            return Constants.FEED_FOLDER_NAME;
-        }
-    }
-
-    public class SourceMonitor: IDataStoragable<SourceMonitorStore>
+    public class SourceMonitor : IDataStoragable<SourceMonitorStore>
     {
         public delegate void SourceMonitorNotify(string eventName);             // delegate
         public delegate void FeedFreshArrival(List<NewsItem> freshNewsItems);   // delegate
@@ -117,6 +87,7 @@ namespace News
             }
         }
 
+        [JsonIgnore]
         public DataStorage<SourceMonitorStore>? Store { get; set; }
 
         private System.Timers.Timer? timer;
@@ -126,7 +97,7 @@ namespace News
         {
             this.Status = SourceMonitorStatus.IDLE;
             this.Feed = feed;
-            this.Store = new DataStorage<SourceMonitorStore>(new SourceMonitorStore(id.ToString()), "Store");
+            this.Store = new DataStorage<SourceMonitorStore>(new SourceMonitorStore(id.ToString()));
             this.LastPoll = DateTime.MinValue;
         }
 
