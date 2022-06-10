@@ -1,6 +1,7 @@
-﻿using System.IO.IsolatedStorage;
+﻿using Elements;
+using System.IO.IsolatedStorage;
 
-namespace Elements
+namespace DataStorage
 {
 
     public interface IFileStorage

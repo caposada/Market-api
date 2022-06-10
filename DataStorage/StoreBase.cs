@@ -1,4 +1,4 @@
-﻿namespace Elements
+﻿namespace DataStorage
 {
     public abstract class StoreBase
     {

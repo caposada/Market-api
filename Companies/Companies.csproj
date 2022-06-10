@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DataStorage\DataStorage.csproj" />
     <ProjectReference Include="..\Elements\Elements.csproj" />
     <ProjectReference Include="..\StockManager\StockManager.csproj" />
   </ItemGroup>

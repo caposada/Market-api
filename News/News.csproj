@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DataStorage\DataStorage.csproj" />
     <ProjectReference Include="..\Elements\Elements.csproj" />
     <ProjectReference Include="..\RssFeedReader\RssFeedReader.csproj" />
     <ProjectReference Include="..\TwitterFeedReader\TwitterFeedReader.csproj" />

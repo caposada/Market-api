@@ -1,5 +1,6 @@
 ﻿using AlphaVantage.Net.Common.Intervals;
 using AlphaVantage.Net.Stocks;
+using DataStorage;
 using Elements;
 using StockManager;
 using System.Text.Json.Serialization;

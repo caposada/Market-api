@@ -4,6 +4,7 @@ using AlphaVantage.Net.Common.Size;
 using AlphaVantage.Net.Core.Client;
 using AlphaVantage.Net.Stocks;
 using AlphaVantage.Net.Stocks.Client;
+using DataStorage;
 using Elements;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;

@@ -1,4 +1,6 @@
-﻿namespace Elements
+﻿using Elements;
+
+namespace DataStorage
 {    
     public class DataStorage<T> : DataStorageBase<StoreBase> where T : new()
     {

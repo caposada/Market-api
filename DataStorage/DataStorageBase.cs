@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Elements
+namespace DataStorage
 {
     public class DataStorageBase<T> where T : StoreBase
     {

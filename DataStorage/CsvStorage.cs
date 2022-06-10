@@ -1,4 +1,6 @@
-﻿namespace Elements
+﻿using Elements;
+
+namespace DataStorage
 {
     public class CsvStorage : Storage
     {

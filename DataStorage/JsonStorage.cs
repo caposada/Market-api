@@ -1,6 +1,7 @@
-﻿using System.Text.Json;
+﻿using Elements;
+using System.Text.Json;
 
-namespace Elements
+namespace DataStorage
 {
     public class JsonStorage<T> : Storage
     {
