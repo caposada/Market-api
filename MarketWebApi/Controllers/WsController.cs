@@ -19,6 +19,7 @@ namespace MarketWebApi.Controllers
             this.marketApp.NewsManager.FreshArrivals += NewsManager_FreshArrivals;
             this.marketApp.NewsManager.SourceMonitorChanged += NewsManager_SourceMonitorChanged;
             this.marketApp.Gatherer.InterestedItemsChanged += Gatherer_InterestedItemsChanged;
+            this.marketApp.GathererInformation.InformationChanged += GathererInformation_InformationChanged;
             this.marketApp.CompanyDataStore.CompanyChanged += CompanyDataStore_CompanyChanged;
             this.marketApp.MarketRequestor.ResultReady += MarketRequestor_ResultReady;
             this.marketApp.MarketData.StateChange += MarketData_StateChange;
@@ -30,6 +31,7 @@ namespace MarketWebApi.Controllers
             this.marketApp.NewsManager.FreshArrivals -= NewsManager_FreshArrivals;
             this.marketApp.NewsManager.SourceMonitorChanged -= NewsManager_SourceMonitorChanged;
             this.marketApp.Gatherer.InterestedItemsChanged -= Gatherer_InterestedItemsChanged;
+            this.marketApp.GathererInformation.InformationChanged -= GathererInformation_InformationChanged;
             this.marketApp.CompanyDataStore.CompanyChanged -= CompanyDataStore_CompanyChanged;
             this.marketApp.MarketRequestor.ResultReady -= MarketRequestor_ResultReady;
             this.marketApp.MarketData.StateChange -= MarketData_StateChange;
@@ -86,6 +88,14 @@ namespace MarketWebApi.Controllers
             {
                 Data = numberOfInterestingItems.ToString()
             });
+            await Send(jsonString);
+        }
+        private async void GathererInformation_InformationChanged()
+        {
+            string jsonString = JsonSerializer.Serialize(new WebSocketMessage("GathererInformation", "InformationChanged")
+            {
+                Data = marketApp.GathererInformation.RequestQueueProcessorCount.ToString()
+            }); ;
             await Send(jsonString);
         }
 

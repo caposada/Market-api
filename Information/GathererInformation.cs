@@ -49,6 +49,14 @@ namespace Information
                 Store.Save();
             }
         }
+        public int RequestQueueProcessorCount
+        {
+            get
+            {
+                return this.requestQueueProcessor.Count;
+            }
+        }
+
 
         [JsonIgnore]
         public MarketData MarketData { get; set; }
@@ -168,7 +176,6 @@ namespace Information
 
                 // The InterestingItem has all it's TimeSeriesData now, so inform
                 // the Gatherer to save the Information
-                InformationChanged?.Invoke();
                 Store.Save();
             }
         }
@@ -201,6 +208,7 @@ namespace Information
                                 {
                                     requestQueueProcessor.Pulse();
                                     ColourConsole.WriteLine($"Gatherer.Information - pulse [{requestQueueProcessor.Count}].", ConsoleColor.DarkBlue, ConsoleColor.White);
+                                    InformationChanged?.Invoke();
                                 }
 
                                 await MarketData.PauseRequest();
@@ -233,7 +241,7 @@ namespace Information
                 CheckWeHaveAllMarketData();
             }
         }
-
+        
         public void Destroy()
         {
             throw new NotImplementedException();

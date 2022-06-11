@@ -24,6 +24,7 @@ namespace MarketWebApi.Controllers
         {
             public int TotalNonInterestingItemsCount { get; set; }
             public int TotalInterestingItemsCount { get; set; }
+            public int RequestQueueProcessorCount { get; set; }
             public List<SourceItem> SourceItems { get; set; }
         }
 
@@ -120,6 +121,7 @@ namespace MarketWebApi.Controllers
             {
                 TotalNonInterestingItemsCount = marketApp.GathererInformation.NonInterestingItems.Count,
                 TotalInterestingItemsCount = marketApp.GathererInformation.InterestingItems.Count,
+                RequestQueueProcessorCount = marketApp.GathererInformation.RequestQueueProcessorCount,
                 SourceItems = sourceItems
             };
             return details;
