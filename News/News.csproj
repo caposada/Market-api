@@ -7,7 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DataStorage\DataStorage.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Configuration\Configuration.csproj" />
     <ProjectReference Include="..\Elements\Elements.csproj" />
     <ProjectReference Include="..\RssFeedReader\RssFeedReader.csproj" />
     <ProjectReference Include="..\TwitterFeedReader\TwitterFeedReader.csproj" />

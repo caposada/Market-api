@@ -1,62 +1,98 @@
 ﻿using AlphaVantage.Net.Common.Intervals;
-using AlphaVantage.Net.Stocks;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace Elements
 {
     public class TimeSeries // Wrapper for StockTimeSeriesResult
     {
-        public DateTimeOffset PublishedDate { get; private set; }
-        public string? Symbol
+        [Key]
+        public Guid Id { get; set; }
+        public Guid NewsItemId { get; set; }
+        public DateTimeOffset PublishedDate { get; set; }
+        public string Symbol { get; set; }
+        public DateTime ValidUntil { get; set; }
+        public DateTime TimeStamp { get; set; }
+        public Interval Interval { get; set; }
+        public string DataPointsJson { get; set; }
+        [NotMapped]
+        public decimal Min { get; set; }
+        [NotMapped]
+        public decimal Max { get; set; }
+        [NotMapped]
+        public DateTime From { get; set; }
+        [NotMapped]
+        public DateTime To { get; set; }
+        [NotMapped]
+        public decimal MinChangePercent { get; set; }
+        [NotMapped]
+        public decimal MaxChangePercent { get; set; }
+        [NotMapped]
+        public PriceChangeVolatility LowVolatility { get; set; }
+        [NotMapped]
+        public PriceChangeVolatility HighVolatility { get; set; }
+        [NotMapped]
+        public List<DataPoint> DataPoints
         {
             get
             {
-                return stockTimeSeriesResult.Symbol;
+                if (dataPoint == null)
+                    dataPoint = JsonSerializer.Deserialize<List<DataPoint>>(DataPointsJson);
+                return dataPoint;
             }
-        }
-        public DateTime ValidUntil
-        {
-            get
-            {
-                return stockTimeSeriesResult.ValidUntil;
-            }
-        }
-        public DateTime TimeStamp
-        {
-            get
-            {
-                return stockTimeSeriesResult.TimeStamp;
-            }
-        }
-        public Interval Interval
-        {
-            get
-            {
-                return stockTimeSeriesResult.Interval;
-            }
-        }
-        public List<DataPoint>? DataPoints { get; private set; }
-        public decimal Min { get; private set; }
-        public decimal Max { get; private set; }
-        public DateTime From { get; private set; }
-        public DateTime To { get; private set; }
-        public decimal MinChangePercent { get; private set; }
-        public decimal MaxChangePercent { get; private set; }
-        public PriceChangeVolatility LowVolatility { get; private set; }
-        public PriceChangeVolatility HighVolatility { get; private set; }
-
-        private StockTimeSeriesResult stockTimeSeriesResult;
-
-        public TimeSeries(DateTimeOffset publishedDate, StockTimeSeriesResult stockTimeSeriesResult)
-        {
-            this.stockTimeSeriesResult = stockTimeSeriesResult;
-            this.PublishedDate = publishedDate;
         }
 
-        public void ParseData()
+        private List<DataPoint> dataPoint;
+
+        public TimeSeries(
+            Guid id,
+            Guid newsItemId,
+            DateTimeOffset publishedDate,
+            string symbol,
+            DateTime validUntil,
+            DateTime timeStamp,
+            Interval interval,
+            string dataPointsJson)
+        {
+            Id = id;
+            NewsItemId = newsItemId;
+            PublishedDate = publishedDate;
+            Symbol = symbol;
+            ValidUntil = validUntil;
+            TimeStamp = timeStamp;
+            Interval = interval;
+            DataPointsJson = dataPointsJson;
+
+            ParseData();
+        }
+
+        public TimeSeries(Guid newsItemId, DateTimeOffset publishedDate, StockTimeSeriesResult stockTimeSeriesResult)
+        {
+            Id = Guid.NewGuid();
+            NewsItemId = newsItemId;
+            PublishedDate = publishedDate;
+            Symbol = stockTimeSeriesResult.Symbol;
+            ValidUntil = stockTimeSeriesResult.ValidUntil;
+            TimeStamp = stockTimeSeriesResult.TimeStamp;
+            Interval = stockTimeSeriesResult.Interval;
+
+            dataPoint = new List<DataPoint>();
+            foreach (var stockDataPoint in stockTimeSeriesResult?.Result?.DataPoints.ToList())
+            {
+                DataPoint dataPoint = new DataPoint(stockDataPoint);
+                this.DataPoints.Add(dataPoint);
+            }
+
+            DataPointsJson = JsonSerializer.Serialize<List<DataPoint>>(dataPoint);
+
+            ParseData();
+        }
+
+        private void ParseData()
         {
             Task.Run(() =>
             {
-                this.DataPoints = new List<DataPoint>();
                 this.From = DateTime.MaxValue;
                 this.To = DateTime.MinValue;
                 this.Min = int.MaxValue;
@@ -64,34 +100,29 @@ namespace Elements
                 this.MinChangePercent = int.MaxValue;
                 this.MaxChangePercent = int.MinValue;
 
-                List<StockDataPoint>? stockDataPoints = stockTimeSeriesResult?.Result?.DataPoints.ToList();
-                if (stockDataPoints != null)
+                foreach (var dataPoint in DataPoints)
                 {
-                    foreach (var stockDataPoint in stockDataPoints)
-                    {
-                        DataPoint dataPoint = new DataPoint(stockDataPoint);
-                        this.DataPoints.Add(dataPoint);
-                        if (stockDataPoint.ClosingPrice < this.Min)
-                            this.Min = stockDataPoint.ClosingPrice;
-                        if (stockDataPoint.ClosingPrice > this.Max)
-                            this.Max = stockDataPoint.ClosingPrice;
-                        if (stockDataPoint.Time < this.From)
-                            this.From = stockDataPoint.Time;
-                        if (stockDataPoint.Time > this.To)
-                            this.To = stockDataPoint.Time;
-                        if (dataPoint.ChangePercent < this.MinChangePercent)
-                            this.MinChangePercent = dataPoint.ChangePercent;
-                        if (dataPoint.ChangePercent > this.MaxChangePercent)
-                            this.MaxChangePercent = dataPoint.ChangePercent;
-                    }
-
-                    RateVolatility();
-                    GetVectors();
+                    if (dataPoint.ClosingPrice < this.Min)
+                        this.Min = dataPoint.ClosingPrice;
+                    if (dataPoint.ClosingPrice > this.Max)
+                        this.Max = dataPoint.ClosingPrice;
+                    if (dataPoint.Time < this.From)
+                        this.From = dataPoint.Time;
+                    if (dataPoint.Time > this.To)
+                        this.To = dataPoint.Time;
+                    if (dataPoint.ChangePercent < this.MinChangePercent)
+                        this.MinChangePercent = dataPoint.ChangePercent;
+                    if (dataPoint.ChangePercent > this.MaxChangePercent)
+                        this.MaxChangePercent = dataPoint.ChangePercent;
                 }
+
+                RateVolatility();
+                GetVectors();
+
             });
         }
 
-        public void GetVectors()
+        private void GetVectors()
         {
             // Get points before publish data
             var fiveHourBeforeDataPoint = DataPoints.FirstOrDefault(x => x.Time < this.PublishedDate.AddHours(-5), DataPoints.Last());

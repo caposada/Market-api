@@ -61,7 +61,7 @@ namespace StockManager
                 // Found a matching previous request, so mock the request
                 if (previousRetrieval.RecordId != null)
                 {
-                    return new RequestResult(previousRetrieval.RecordId.Value, MarketDataRequestStatus.SUCCESS);
+                    return new RequestResult(previousRetrieval.RecordId, MarketDataRequestStatus.SUCCESS);
                 }
             }
 
@@ -111,7 +111,7 @@ namespace StockManager
                 // Found a matching previous request, so mock the request
                 if (previousRetrieval.RecordId != null)
                 {
-                    return new RequestResult(previousRetrieval.RecordId.Value, MarketDataRequestStatus.SUCCESS);
+                    return new RequestResult(previousRetrieval.RecordId, MarketDataRequestStatus.SUCCESS);
                 }
             }
 

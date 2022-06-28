@@ -1,8 +1,6 @@
 ﻿using Elements;
 using Information;
 using Microsoft.AspNetCore.Mvc;
-using News;
-using TextAnalysis;
 
 namespace MarketWebApi.Controllers
 {
@@ -40,7 +38,7 @@ namespace MarketWebApi.Controllers
 
                 public InterestingItem(Information.InterestingItem iterestingItem)
                 {
-                    Id = iterestingItem.Id;
+                    Id = iterestingItem.NewsItemId;
                     Text = iterestingItem.Text;
                     PublishDate = iterestingItem.PublishDate;
                     Findings = iterestingItem.Findings;
@@ -53,16 +51,16 @@ namespace MarketWebApi.Controllers
 
             public InterestingItemsDetails(List<Information.InterestingItem> interestingItems, Filter filter)
             {
-                interestingItems = interestingItems.OrderByDescending(x => x.PublishDate).ToList();
+                var orderedList = interestingItems.OrderByDescending(x => x.PublishDate).ToList();
 
                 if (filter.HasTimeSeries == true)
-                    interestingItems = interestingItems.FindAll(x => x.StockTimeSeriesExists);
+                    orderedList = orderedList.FindAll(x => x.StockTimeSeriesExists);
 
-                this.InterestingItemsCount = interestingItems.Count;
+                this.InterestingItemsCount = orderedList.Count;
                 this.InterestingItems = new List<InterestingItem>();
 
                 // Only get a certain number of items (MAX_INTERESTINGITEMS)
-                foreach (var interestingItem in interestingItems.Take(MAX_INTERESTINGITEMS))
+                foreach (var interestingItem in orderedList.Take(MAX_INTERESTINGITEMS))
                 {
                     this.InterestingItems.Add(new InterestingItem(interestingItem));
                 }
@@ -98,11 +96,11 @@ namespace MarketWebApi.Controllers
             this.marketApp = marketApp;
         }
 
-        [HttpPut("Clean")]
-        public void Clean()
-        {
-            marketApp.GathererInformation.CleanAsync();
-        }
+        //[HttpPut("Clean")]
+        //public void Clean()
+        //{
+        //    _ = marketApp.Gatherer.CleanAsync();
+        //}
 
         [HttpGet("Details")]
         public ActionResult<GathererDetails> GetDetails()
@@ -138,7 +136,7 @@ namespace MarketWebApi.Controllers
         public ActionResult<InterestingItemDetails> GetInterestingItemDetails(string id)
         {
             Guid guid = Guid.Parse(id);
-            var interestingItem = marketApp.GathererInformation.InterestingItems.Find(x => x.Id == guid);
+            var interestingItem = marketApp.GathererInformation.InterestingItems.Find(x => x.NewsItemId == guid);
             var source = marketApp.NewsManager.GetSource(interestingItem.SourceId);
             InterestingItemDetails details = new InterestingItemDetails()
             {
@@ -188,7 +186,7 @@ namespace MarketWebApi.Controllers
                 }
             }
 
-            InterestingItemsDetails details = new InterestingItemsDetails(interestingItems, filter);
+            InterestingItemsDetails details = new InterestingItemsDetails(interestingItems.DistinctBy(x => x.NewsItemId).ToList(), filter);
             return details;
         }
 
@@ -210,7 +208,7 @@ namespace MarketWebApi.Controllers
                 }
             }
 
-            InterestingItemsDetails details = new InterestingItemsDetails(interestingItems, filter);
+            InterestingItemsDetails details = new InterestingItemsDetails(interestingItems.DistinctBy(x => x.NewsItemId).ToList(), filter);
             return details;
         }
 

@@ -28,7 +28,7 @@
                 return actionsQueue.Count;
             }
         }
-
+        public bool RunAutomatically { get; set; }
 
         private Queue<Action> actionsQueue = new Queue<Action>();
         protected Task? queueProcessingTask;
@@ -52,6 +52,9 @@
             {
                 _semaphore.Release();
             }
+
+            if (RunAutomatically)
+                await Run();
         }
 
         public virtual async Task Run()

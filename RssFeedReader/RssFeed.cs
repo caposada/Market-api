@@ -19,10 +19,11 @@ namespace RssFeedReader
             {
                 HttpClient client = new HttpClient();
                 client.DefaultRequestHeaders.Add("User-Agent", "SO/1.0"); // < ---Huh ? Nasdaq won't work without it
-                
+
+                ColourConsole.WriteInfo($"NewsFeed (RssFeed) - getting news for [{this.Title}]: ");
                 HttpResponseMessage response = await client.GetAsync(this.Url);
                 response.EnsureSuccessStatusCode();
-                
+
                 string rss = await response.Content.ReadAsStringAsync();
                 XmlReader reader = XmlReader.Create(new StringReader(rss));
                 var feed = SyndicationFeed.Load(reader);
@@ -42,7 +43,7 @@ namespace RssFeedReader
             }
             catch (Exception ex)
             {
-                ColourConsole.WriteError($"NewsFeed (RssFeed) [{this.Title}] Exception: " + ex.Message);
+                ColourConsole.WriteError($"NewsFeed (RssFeed) - [{this.Title}] Exception: " + ex.Message);
             }
             return newsItems;
         }

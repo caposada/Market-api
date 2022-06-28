@@ -1,23 +1,32 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace Elements
 {
     public class CompanyOverview
     {
+        [Key]
+        public Guid Id { get; set; }
+        [ForeignKey("Symbol")]
         public string Symbol { get; set; }
         public DateTime LastUpdated { get; set; }
-        public Dictionary<string, string> OverviewDictionary { get; set; }
+        public string JsonData { get; set; }
 
-        [JsonConstructorAttribute]
-        public CompanyOverview()
+        [NotMapped]
+        public Dictionary<string, string> OverviewDictionary
         {
-            this.OverviewDictionary = new Dictionary<string, string>();
+            get
+            {
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(JsonData);
+            }
         }
 
-        public CompanyOverview(SimpleCompany company, Dictionary<string, string> dataDictionary)
+        public CompanyOverview(string symbol, string jsonData)
         {
-            this.Symbol = company.Symbol;
-            this.OverviewDictionary = dataDictionary;
+            this.Id = Guid.NewGuid();
+            this.Symbol = symbol;
+            this.JsonData = jsonData;
         }
 
         public bool IsValid()

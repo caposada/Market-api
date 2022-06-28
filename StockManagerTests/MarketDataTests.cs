@@ -1,12 +1,6 @@
 ﻿using AlphaVantage.Net.Common.Intervals;
 using AlphaVantage.Net.Stocks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using StockManager;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace StockManager.Tests
 {
@@ -27,7 +21,7 @@ namespace StockManager.Tests
             Assert.AreEqual(DateTime.MinValue, sharedMarketData.NextReady, $"Should initially be {DateTime.MinValue}");
             Assert.AreEqual(MarketDataStatus.OKAY, sharedMarketData.Status, "Should initially be OKAY");
         }
-        
+
         [TestMethod()]
         public void Settings()
         {
@@ -122,13 +116,13 @@ namespace StockManager.Tests
             Assert.AreEqual(MarketDataRequestStatus.SUCCESS, marketDataRequest.MarketDataRequestStatus, "Should be SUCCESS");
             Assert.IsTrue(quote.Symbol == symbol, "Should be the relevant company Symbol");
 
-            Retrieval<QuoteRequest, GlobalQuote> foundRetrieval = sharedMarketData.FindPreviousMatchingRetrieval(request);
-            Assert.IsTrue(foundRetrieval.Requesting.Symbol == symbol, "Should be the same Symbol");
+            Retrieval<GlobalQuote> foundRetrieval = sharedMarketData.FindPreviousMatchingRetrieval(request);
+            Assert.IsTrue(foundRetrieval.Symbol == symbol, "Should be the same Symbol");
             Assert.IsTrue(foundRetrieval.RecordId == recordId, "Should be the same RecordId");
             Assert.IsTrue(foundRetrieval.ValidUntil > DateTime.Now, "Should be valid for at least over a minute");
             Assert.AreEqual(quote, foundRetrieval.GetResult(), "Should be the same quote object as before");
 
-            Retrieval<QuoteRequest, GlobalQuote> retrieval = sharedMarketData.GetQuoteRetrieval(recordId);
+            Retrieval<GlobalQuote> retrieval = sharedMarketData.GetQuoteRetrieval(recordId);
             Assert.AreEqual(quote, foundRetrieval.GetResult(), "Should be the same GlobalQuote object as before");
         }
 
@@ -157,15 +151,15 @@ namespace StockManager.Tests
             Assert.IsTrue(timeSeries.Interval == interval, "Should be a the same interval");
 
 
-            Retrieval<TimeSerieseRequest, StockTimeSeries> foundRetrieval = sharedMarketData.FindPreviousMatchingRetrieval(request);
-            Assert.IsTrue(foundRetrieval.Requesting.Symbol == symbol, "Should be the same Symbol");
-            Assert.IsTrue(foundRetrieval.Requesting.Interval == interval, "Should be the same Interval");
+            Retrieval<StockTimeSeries> foundRetrieval = sharedMarketData.FindPreviousMatchingRetrieval(request);
+            Assert.IsTrue(foundRetrieval.Symbol == symbol, "Should be the same Symbol");
+            Assert.IsTrue(foundRetrieval.Interval == interval, "Should be the same Interval");
             Assert.IsTrue(foundRetrieval.RecordId == recordId, "Should be the same RecordId");
             Assert.IsTrue(foundRetrieval.ValidUntil > DateTime.Now, "Should be valid for at least over a minute");
             Assert.AreEqual(timeSeries, foundRetrieval.GetResult(), "Should be the same StockTimeSeries object as before");
 
 
-            Retrieval<TimeSerieseRequest, StockTimeSeries> retrieval = sharedMarketData.GetTimeSeriesRetrieval(recordId);
+            Retrieval<StockTimeSeries> retrieval = sharedMarketData.GetTimeSeriesRetrieval(recordId);
             Assert.AreEqual(timeSeries, foundRetrieval.GetResult(), "Should be the same StockTimeSeries object as before");
 
 

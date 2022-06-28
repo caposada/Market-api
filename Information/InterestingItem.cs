@@ -1,76 +1,62 @@
 ﻿using AlphaVantage.Net.Common.Intervals;
 using AlphaVantage.Net.Stocks;
-using DataStorage;
 using Elements;
 using StockManager;
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 using TextAnalysis;
 
 namespace Information
 {
     public delegate void InterestingItemsNotify(InterestingItem interestingItem);                               // delegate
-    
-    public class InterestingItem : GathererInformationItem, IDataStoragable<FindingsStore>
+
+    public class InterestingItem : GathererInformationItem
     {
         private const int NUMBER_OF_DAYS_IN_THE_PAST = 10;
 
         public event InterestingItemsNotify? AllTimeSeriesDataProcessed;             // event
-         
-        [JsonIgnore]
-        public string? Text
-        {
-            get
-            {
-                return Store.Data.Text;
-            }
-        }
-        [JsonIgnore]
-        public DateTimeOffset PublishDate
-        {
-            get
-            {
-                return Store.Data.PublishDate;
-            }
-        }
-        [JsonIgnore]
+
+        [NotMapped]
         public List<AnalysisFinding>? Findings
         {
             get
             {
-                return Store.Data.Findings;
+                using (InformationContext context = new InformationContext())
+                {
+                    return context.AnalysisFindings.Where(x => x.NewsItemId == this.NewsItemId).ToList();
+                }
             }
         }
-        [JsonIgnore]
+        [NotMapped]
         public AnalysisBreakDown? AnalysisBreakDown
         {
             get
             {
-                if (breakdown == null)
-                    breakdown = new BreakDown(this.Id);
-                return breakdown.AnalysisBreakDown;
+                using (InformationContext context = new InformationContext())
+                {
+                    return context.AnalysisBreakDowns.Where(x => x.NewsItemId == this.NewsItemId).FirstOrDefault();
+                }
             }
         }
-        [JsonIgnore]
+        [NotMapped]
         public List<TimeSeries> TimeSerieses
         {
             get
             {
-                if (timeSeriesData == null)
-                    timeSeriesData = new TimeSeriesData(this.Id, this.PublishDate);
-                return timeSeriesData.TimeSerieses;
+                using (InformationContext context = new InformationContext())
+                {
+                    return context.TimeSerieses.Where(x => x.NewsItemId == NewsItemId).ToList();
+                }
             }
         }
-        [JsonIgnore]
+        [NotMapped]
         public bool StockTimeSeriesExists
         {
             get
             {
-                if (timeSeriesData == null)
-                    timeSeriesData = new TimeSeriesData(this.Id, this.PublishDate);
-                return timeSeriesData.Exists;
+                return TimeSerieses.Count > 0;
             }
         }
-        [JsonIgnore]
+        [NotMapped]
         public bool NeedToRetrieveTimeSeriesData
         {
             get
@@ -82,42 +68,47 @@ namespace Information
                     || TimeSeriesStatus == TimeSeriesStatus.PRE_DATE;
             }
         }
+
+
+
+
         public TimeSeriesStatus TimeSeriesStatus { get; set; }
 
-        [JsonIgnore]
-        public DataStorage<FindingsStore>? Store { get; set; }
 
-        private BreakDown? breakdown;
-        private TimeSeriesData? timeSeriesData;
+
         private static StockExchange stockExchange = new NYSE();
         private List<MarketDataRequestAction>? marketDataRequestActions;
 
-        [JsonConstructorAttribute]
-        public InterestingItem(Guid id, Guid sourceId, DateTime timestamp)
-            : base(id, sourceId, timestamp)
+
+
+        public InterestingItem(Guid newsItemId, Guid sourceId, DateTime timestamp, string text, DateTimeOffset publishDate)
+            : base(newsItemId, sourceId, timestamp, text, publishDate)
         {
-            Store = new DataStorage<FindingsStore>(new FindingsStore(this.Id.ToString()));
-            Store.Load();
-        }
-
-        public InterestingItem(AnalysisInfo info)
-            : base(info.NewsItem.Id, info.NewsItem.SourceId, DateTime.Now)
-        {
-            Store = new DataStorage<FindingsStore>(new FindingsStore(this.Id.ToString()));
-            Store.Data.Text = info.Text;
-            Store.Data.PublishDate = info.NewsItem.PublishDate;
-            Store.Data.Findings = info.Findings;
-            Store.Save();
-
-            breakdown = new BreakDown(this.Id);
-            breakdown.AnalysisBreakDown = info.BreakDown;
-
             this.TimeSeriesStatus = TimeSeriesStatus.NOT_SEEN;
         }
 
-        public void Destroy()
+        public async Task SetInfoAsync(AnalysisInfo info)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using (InformationContext context = new InformationContext())
+                {
+                    foreach (var finding in info.Findings)
+                    {
+                        context.AnalysisFindings.Add(
+                            new AnalysisFinding(this.NewsItemId, finding.Company, finding.Confidence, finding.Rationale, finding.Tokens));
+                    }
+
+                    context.AnalysisBreakDowns.Add(
+                        new AnalysisBreakDown(this.NewsItemId, info.BreakDown.Spans));
+
+                    await context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+
+            }
         }
 
         public List<MarketDataRequestAction>? GetMarketDataRequestActions(MarketData marketData)
@@ -163,11 +154,14 @@ namespace Information
                                 await marketData.GetTimeSeries(marketDataRequest);
                                 if (marketDataRequest.MarketDataRequestStatus == MarketDataRequestStatus.SUCCESS && marketDataRequest.Resulting != null)
                                 {
-                                    if (timeSeriesData == null)
-                                        timeSeriesData = new TimeSeriesData(this.Id, this.PublishDate);
 
-                                    StockTimeSeriesResult stockTimeSeriesResult = new StockTimeSeriesResult(symbol, validUntil, DateTime.Now, interval, marketDataRequest.Resulting);
-                                    timeSeriesData.Add(stockTimeSeriesResult);
+                                    using (InformationContext context = new InformationContext())
+                                    {
+                                        StockTimeSeriesResult stockTimeSeriesResult = new StockTimeSeriesResult(symbol, validUntil, DateTime.Now, interval, marketDataRequest.Resulting);
+                                        TimeSeries timeSeries = new TimeSeries(this.NewsItemId, this.PublishDate, stockTimeSeriesResult);
+                                        context.TimeSerieses.Add(timeSeries);
+                                        context.SaveChanges();
+                                    }
 
                                     actionsComplete++;
                                 }
@@ -251,6 +245,11 @@ namespace Information
             }
 
             return true; // All is fine
+        }
+
+        public override string ToString()
+        {
+            return $"ID: {this.NewsItemId}";
         }
 
     }

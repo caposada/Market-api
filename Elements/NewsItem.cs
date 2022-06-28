@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace Elements
+﻿namespace Elements
 {
 
     public class NewsItem
@@ -12,7 +10,6 @@ namespace Elements
         public string Text { get; set; }
         public Guid SourceId { get; set; }
 
-        [JsonConstructorAttribute]
         public NewsItem(Guid id, string refId, DateTimeOffset publishDate, DateTime timestamp, string text, Guid sourceId)
         {
             this.Id = id;

@@ -107,17 +107,10 @@ namespace MarketWebApi.Controllers
         }
 
         [HttpPut("{symbol}")]
-        public async Task<SimpleCompany?> UpdateCompany(string symbol, [FromBody] UpdateDetails details)
+        public void UpdateCompany(string symbol, [FromBody] UpdateDetails details)
         {
             if (details.Aliases != null)
-                return await marketApp.CompanyDataStore.SetAliases(symbol, details.Aliases);
-            return null;
+                _ = marketApp.CompanyDataStore.SetAliases(symbol, details.Aliases);
         }
-
-
-
-
-
-
     }
 }

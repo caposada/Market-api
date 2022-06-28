@@ -4,17 +4,15 @@ using AlphaVantage.Net.Common.Size;
 using AlphaVantage.Net.Core.Client;
 using AlphaVantage.Net.Stocks;
 using AlphaVantage.Net.Stocks.Client;
-using DataStorage;
 using Elements;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
 [assembly: InternalsVisibleTo("StockManagerTests")]
 namespace StockManager
 {
     public delegate void MarketDataNotify();                    // delegate
-    
-    public partial class MarketData : IDataStoragable<MarketDataPreviousRetrievalsStore>
+
+    public partial class MarketData
     {
         public event MarketDataNotify? StateChange;              // event
 
@@ -25,9 +23,6 @@ namespace StockManager
         private static Task? dailyResetTask;
         private MarketDataSettings settings;
         private MarketDataLogger logger;
-
-        [JsonIgnore]
-        public DataStorage<MarketDataPreviousRetrievalsStore>? Store { get; set; }
 
         public int ActiveCallsCount { get; private set; }
         public int CallCountInMinute { get; private set; }
@@ -74,9 +69,6 @@ namespace StockManager
         {
             this.settings = new MarketDataSettings();
             this.logger = new MarketDataLogger();
-
-            this.Store = new DataStorage<MarketDataPreviousRetrievalsStore>(new MarketDataPreviousRetrievalsStore());
-            this.Store.Load();
         }
 
         public async Task GetCompanyListings(MarketDataRequest<CompanyListingsRequest, string> marketDataRequest)
@@ -140,34 +132,41 @@ namespace StockManager
                     marketDataRequest.SetResult(result);
 
                     // MarketDataSettingsStore this result for future recalls
-                    var retrieval = new Retrieval<QuoteRequest, GlobalQuote>(
-                        marketDataRequest.Requesting,
-                        marketDataRequest.Resulting,
-                        GetValidUntil(),
-                        marketDataRequest.RecordId);
-                    Store.Data.PreviousQuoteRetrievals.Add(retrieval);
-                    Store.Save();
+                    using (StockMarketContext context = new StockMarketContext())
+                    {
+                        var retrieval = new Retrieval<GlobalQuote>(
+                            marketDataRequest.Requesting.Symbol,
+                            GetValidUntil(),
+                            marketDataRequest.Resulting,
+                            marketDataRequest.RecordId);
+                        context.PreviousQuoteRetrievals.Add(retrieval);
+                        context.SaveChanges();
+                    }
                 });
                 await DoRequest(marketDataRequest, taskAction);
             }
         }
 
-        public Retrieval<QuoteRequest, GlobalQuote>? FindPreviousMatchingRetrieval(QuoteRequest request)
+        public Retrieval<GlobalQuote>? FindPreviousMatchingRetrieval(QuoteRequest request)
         {
             // 13:15 Previous ValidUntil
             // 13:07 Now
             DateTime now = DateTime.Now;
 
-            var retrieval = Store.Data.PreviousQuoteRetrievals.Find(x =>
-                x.Requesting?.Symbol == request.Symbol &&
-                x.ValidUntil > now);
-
-            return retrieval;
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                return context.PreviousQuoteRetrievals.Where(x =>
+                    x.Symbol == request.Symbol &&
+                    x.ValidUntil > now).FirstOrDefault();
+            }
         }
 
-        public Retrieval<QuoteRequest, GlobalQuote>? GetQuoteRetrieval(Guid recordId)
+        public Retrieval<GlobalQuote>? GetQuoteRetrieval(Guid recordId)
         {
-            return (Retrieval<QuoteRequest, GlobalQuote>?)Store.Data.PreviousQuoteRetrievals.Find(x => x.RecordId == recordId);
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                return context.PreviousQuoteRetrievals.Where(x => x.RecordId == recordId).FirstOrDefault();
+            }
         }
 
         public async Task GetTimeSeries(MarketDataRequest<TimeSerieseRequest, StockTimeSeries> marketDataRequest)
@@ -198,36 +197,44 @@ namespace StockManager
                         marketDataRequest.SetResult(result);
 
                         // MarketDataSettingsStore this result for future recalls
-                        var retrieval = new Retrieval<TimeSerieseRequest, StockTimeSeries>(
-                            marketDataRequest.Requesting,
-                            marketDataRequest.Resulting,
-                            GetValidUntil(marketDataRequest.Requesting.Interval),
-                            marketDataRequest.RecordId);
-                        Store.Data.PreviousTimeSerieseRetrievals.Add(retrieval);
-                        Store.Save();
+                        using (StockMarketContext context = new StockMarketContext())
+                        {
+                            var retrieval = new Retrieval<StockTimeSeries>(
+                                marketDataRequest.Requesting.Symbol,
+                                marketDataRequest.Requesting.Interval,
+                                GetValidUntil(marketDataRequest.Requesting.Interval),
+                                marketDataRequest.Resulting,
+                                marketDataRequest.RecordId);
+                            context.PreviousTimeSerieseRetrievals.Add(retrieval);
+                            context.SaveChanges();
+                        }
                     });
                     await DoRequest(marketDataRequest, taskAction);
                 }
             }
         }
 
-        public Retrieval<TimeSerieseRequest, StockTimeSeries>? FindPreviousMatchingRetrieval(TimeSerieseRequest request)
+        public Retrieval<StockTimeSeries>? FindPreviousMatchingRetrieval(TimeSerieseRequest request)
         {
             // 13:15 Previous ValidUntil
             // 13:07 Now
             DateTime now = DateTime.Now;
 
-            var retrieval = Store.Data.PreviousTimeSerieseRetrievals.Find(x =>
-                x.Requesting?.Symbol == request.Symbol &&
-                x.Requesting.Interval == request.Interval &&
-                x.ValidUntil > now);
-
-            return retrieval;
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                return context.PreviousTimeSerieseRetrievals.Where(x =>
+                x.Symbol == request.Symbol &&
+                x.Interval == request.Interval &&
+                x.ValidUntil > now).FirstOrDefault();
+            }
         }
 
-        public Retrieval<TimeSerieseRequest, StockTimeSeries>? GetTimeSeriesRetrieval(Guid recordId)
+        public Retrieval<StockTimeSeries>? GetTimeSeriesRetrieval(Guid recordId)
         {
-            return (Retrieval<TimeSerieseRequest, StockTimeSeries>?)Store.Data.PreviousTimeSerieseRetrievals.Find(x => x.RecordId == recordId);
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                return context.PreviousTimeSerieseRetrievals.Where(x => x.RecordId == recordId).FirstOrDefault();
+            }
         }
 
         public int GetWhenNextReady()
@@ -235,32 +242,33 @@ namespace StockManager
             int milliseconds = Utils.GetWhen(NextReady);
             return milliseconds >= 0 ? milliseconds : 0;
         }
-        
+
         public async Task ClearAllPreviousRetrievals()
         {
-            await Store.CleanAsync(new List<Guid>());
-
-            Store.Data.PreviousQuoteRetrievals.Clear();
-            Store.Data.PreviousTimeSerieseRetrievals.Clear();
-            Store.Save();
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                context.PreviousQuoteRetrievals.RemoveRange(context.PreviousQuoteRetrievals);
+                context.PreviousTimeSerieseRetrievals.RemoveRange(context.PreviousTimeSerieseRetrievals);
+                context.SaveChanges();
+            }
         }
 
         public async Task ClearPreviousQuoteRetrievals()
         {
-            List<Guid> currentIds = Store.Data.PreviousTimeSerieseRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
-            await Store.CleanAsync(currentIds);
-
-            Store.Data.PreviousQuoteRetrievals.Clear();
-            Store.Save();
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                context.PreviousQuoteRetrievals.RemoveRange(context.PreviousQuoteRetrievals);
+                context.SaveChanges();
+            }
         }
 
         public async Task ClearPreviousTimeSeriesRetrievals()
         {
-            List<Guid> currentIds = Store.Data.PreviousQuoteRetrievals.Select(x => x.RecordId.Value).ToList(); // These are the ones we will keep
-            await Store.CleanAsync(currentIds);
-
-            Store.Data.PreviousTimeSerieseRetrievals.Clear();
-            Store.Save();
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                context.PreviousTimeSerieseRetrievals.RemoveRange(context.PreviousTimeSerieseRetrievals);
+                context.SaveChanges();
+            }
         }
 
         public async Task PauseRequest()
@@ -487,9 +495,5 @@ namespace StockManager
             }
         }
 
-        public void Destroy()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

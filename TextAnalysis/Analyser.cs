@@ -4,7 +4,6 @@ using Companies;
 using Elements;
 using Mosaik.Core;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 
 [assembly: InternalsVisibleTo("TextAnalysisTests")]
 namespace TextAnalysis
@@ -392,7 +391,6 @@ namespace TextAnalysis
         {
             Console.WriteLine($"Input text:\n\t'{doc.Value}'\n\nTokenized Value:\n\t'{doc.TokenizedValue(mergeEntities: true)}'\n\nEntities: \n{string.Join("\n", doc.SelectMany(span => span.GetEntities()).Select(e => $"\t{e.Value} [{e.EntityType.Type}]"))}");
         }
-
 
     }
 

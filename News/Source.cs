@@ -1,112 +1,58 @@
 ﻿using Elements;
 using RssFeedReader;
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using TwitterFeedReader;
 
 namespace News
 {
-    
+
     public class Source
     {
-        public delegate void SourceMonitorNotify(Guid id, string eventName);            // delegate
-        public delegate void FeedFreshArrival(Guid id, List<NewsItem> freshNewsItems);  // delegate
 
-        public event SourceMonitorNotify? SourceMonitorChanged;                         // event
-        public event FeedFreshArrival? FreshArrivals;                                   // event
-               
-        private NewsData newsData;
-
-        [JsonIgnore]
+        [NotMapped]
         public SourceMonitor? SourceMonitor { get; set; }
-        [JsonIgnore]
-        public List<NewsItem> NewsItems
-        {
-            get
-            {
-                return this.newsData.NewsItems;
-            }
-        }
-        [JsonIgnore]
-        public DateTimeOffset? LastPublished
-        {
-            get
-            {
-                return this.newsData.LastPublished;
-            }
-        }
 
+        [Key]
         public Guid Id { get; set; }
-        public string? Timezone { get; set; }
+        public string Timezone { get; set; }
         public FeedType FeedType { get; set; }
         public string FeedTitle { get; set; }
         public string FeedUrl { get; set; }
+        public TimeSpan PollingTimespan { get; set; }
 
-        [JsonConstructorAttribute]
-        public Source()
-        {
-            // This constructor is used when sources/feeds are loaded at startup           
-        }
-
-        public Source(FeedType feedType, string title, string url, string timezone)
+        public Source(FeedType feedType, string feedTitle, string feedUrl, string timezone, TimeSpan pollingTimespan)
         {
             // This constructor is used when added a new source/feed
             this.Id = Guid.NewGuid();
             this.FeedType = feedType;
-            this.FeedTitle = title;
-            this.FeedUrl = url;
+            this.FeedTitle = feedTitle;
+            this.FeedUrl = feedUrl;
             this.Timezone = timezone;
+            this.PollingTimespan = pollingTimespan;
+        }
 
-            this.newsData = new NewsData(this.Id);
+        public void SetPolling(bool polling)
+        {
+            SourceMonitor.IsPolling = polling;
+        }
 
-            NewsFeed? feed = MakeFeed();
+        public void SetPollingTimespan(TimeSpan pollingTimespan)
+        {
+            PollingTimespan = PollingTimespan.Add(pollingTimespan);
+            SourceMonitor.PollingTimespan = PollingTimespan;
+        }
 
-            this.SourceMonitor = new SourceMonitor(this.Id, feed);
-            this.SourceMonitor.Changed += SourceMonitor_Changed;
-            this.SourceMonitor.FreshArrivals += SourceMonitor_FreshArrivals;
-            this.SourceMonitor.Save();
+        public void Setup()
+        {
+            Func<NewsFeed> NewsFeedFunc = MakeFeed;
+            this.SourceMonitor = new SourceMonitor(this.Id, NewsFeedFunc, this.PollingTimespan);
+        }
+
+        public void Start()
+        {
             this.SourceMonitor.Run();    // Do a run
             this.SourceMonitor.Start();  // Start the periodic timer
-        }
-
-        public void Destroy()
-        {
-            newsData.Destroy();
-            SourceMonitor.Destroy();
-        }
-
-        public void Load()
-        {
-            this.newsData = new NewsData(this.Id);
-
-            NewsFeed? feed = MakeFeed();
-
-            this.SourceMonitor = new SourceMonitor(this.Id, feed);
-            this.SourceMonitor.Changed += SourceMonitor_Changed;
-            this.SourceMonitor.FreshArrivals += SourceMonitor_FreshArrivals;
-            this.SourceMonitor.Load();
-            this.SourceMonitor.Run();    // Do a run
-            this.SourceMonitor.Start();  // Start the periodic timer <-- Maybe we add a flag stored in datafile for on/off 
-        }
-
-        public void ExpungeAllNewsItems()
-        {
-            newsData.ExpungeAllNewsItems();
-        }
-
-        private void SourceMonitor_Changed(string eventName)
-        {
-            SourceMonitorChanged?.Invoke(this.Id, eventName);
-        }
-
-        private void SourceMonitor_FreshArrivals(List<NewsItem> freshNewsItems)
-        {
-            List<NewsItem> brandNewNewsItems = newsData.ProcessFreshItems(freshNewsItems);
-            if (brandNewNewsItems.Count > 0)
-            {
-                // Fire event!!!!
-                FreshArrivals(this.Id, brandNewNewsItems);
-
-            }
         }
 
         public NewsFeed MakeFeed()

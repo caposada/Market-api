@@ -1,48 +1,60 @@
-﻿using DataStorage;
-using Elements;
-using System.Text.Json.Serialization;
+﻿using AlphaVantage.Net.Common.Intervals;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace StockManager
-{   
-    public class Retrieval<Request, Result> : BaseRetrieval, IDataStoragable<ResultStore<Result>>
-    {        
+{
+    public class Retrieval<Result>
+    {
+        [Key]
+        public Guid RecordId { get; set; }
+        public string Symbol { get; set; }
+        public Interval? Interval { get; set; }
+        public DateTime ValidUntil { get; set; }
+        public string ResultingJson { get; set; }
 
-        [JsonIgnore]
-        public DataStorage<ResultStore<Result>>? Store { get; set; }
-
-        public Request? Requesting { get; set; }
-
-        [JsonConstructor]
-        public Retrieval()
+        [NotMapped]
+        public Result? Resulting
         {
-
+            get
+            {
+                return JsonSerializer.Deserialize<Result>(ResultingJson);
+            }
         }
 
-        public Retrieval(Request requesting, Result? resulting, DateTime validUntil, Guid? recordId = null)
+        public Retrieval(Guid recordId, string symbol, Interval? interval, DateTime validUntil, string resultingJson)
+        {
+            this.RecordId = recordId;
+            this.Symbol = symbol;
+            this.Interval = interval;
+            this.ValidUntil = validUntil;
+            this.ResultingJson = resultingJson;
+        }
+
+        public Retrieval(string symbol, DateTime validUntil, Result resulting, Guid? recordId = null)
         {
             this.RecordId = recordId ?? Guid.NewGuid();
-            this.Requesting = requesting;
+            this.Symbol = symbol;
             this.ValidUntil = validUntil;
 
-            this.Store = new DataStorage<ResultStore<Result>>(new ResultStore<Result>(RecordId.ToString()));
-            this.Store.Data.Result = resulting;
-            this.Store.Save();
+            this.ResultingJson = JsonSerializer.Serialize<Result>(resulting);
+        }
+
+        public Retrieval(string symbol, Interval interval, DateTime validUntil, Result resulting, Guid? recordId = null)
+        {
+            this.RecordId = recordId ?? Guid.NewGuid();
+            this.Symbol = symbol;
+            this.Interval = interval;
+            this.ValidUntil = validUntil;
+
+            this.ResultingJson = JsonSerializer.Serialize<Result>(resulting);
         }
 
         public Result? GetResult()
         {
-            if (Store == null)
-                Store = new DataStorage<ResultStore<Result>>(new ResultStore<Result>(RecordId.ToString()));
-
-            if (Store.Data.Result == null)
-                Store.Load();
-
-            return Store.Data.Result;
+            return JsonSerializer.Deserialize<Result>(ResultingJson);
         }
 
-        public void Destroy()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

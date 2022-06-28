@@ -22,20 +22,16 @@ namespace Companies
             this.marketData = marketData;
         }
 
-        public async Task<SimpleCompany?> SetAliases(string symbol, List<string> aliases)
+        public async Task SetAliases(string symbol, List<string> aliases)
         {
             await Load();
             SimpleCompany? company = companiesList?.Companies.Find(x => x.Symbol == symbol);
             if (company != null)
             {
-                var alias = companiesAliasList?.SetAlias(symbol, aliases);
-                if (alias != null)
-                {
-                    company.Aliases = alias.Names;
-                    CompanyChanged?.Invoke(symbol);
-                }
+                companiesAliasList?.SetAlias(symbol, aliases);
+                company.Aliases = aliases;
+                CompanyChanged?.Invoke(symbol);
             }
-            return company;
         }
 
         public async Task<CompanyOverview?> GetOverview(string symbol)
@@ -123,12 +119,13 @@ namespace Companies
 
             // Associate the list of 'Company Aliases' with each company
             companiesAliasList = new CompaniesAliasList();
-            foreach (var alias in companiesAliasList.Aliases)
+            List<CompanyAlias> aliases = companiesAliasList.GetAliases();
+            foreach (var alias in aliases)
             {
                 var company = companiesList?.Companies?.Find(x => x.Symbol == alias.Symbol);
                 if (company != null)
                 {
-                    company.Aliases = alias.Names;
+                    company.Aliases = companiesAliasList.GetNames(company.Symbol);
                 }
             }
 

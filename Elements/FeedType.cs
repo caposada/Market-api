@@ -1,4 +1,4 @@
-﻿namespace News
+﻿namespace Elements
 {
     public enum FeedType
     {

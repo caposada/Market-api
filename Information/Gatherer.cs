@@ -14,20 +14,6 @@ namespace Information
 
         private const AnalysisConfidence MINIMUM_CONFIDENCE = AnalysisConfidence.HIGH;
 
-        /*
-         * This will get all the newsitems from NewsManager (Souces/feeds)
-         * into one big list of NewsItems.
-         * It will check if it has all of them against its own list of
-         * interesting and non-interesting items.
-         * Anything new, will be added to a queue to process.
-         * After, it will react to events from the NewsManager regarding new NewsUtems,
-         * and add them to the queue.
-         * The queue will be processed for interesting news.
-         * Anything interesting will be recorded, and non-interesting will also be recorded.
-         * If something IS interesting, an event will be fired for processing up the chain.
-         * 
-         */
-
         private AsyncronousQueueProcessor newsItemsQueueProcessor;
         private CancellationTokenSource queueStartTokenSource = new CancellationTokenSource();
         private int interestingItemCount = 0;
@@ -46,7 +32,7 @@ namespace Information
             newsItemsQueueProcessor = new AsyncronousQueueProcessor();
             newsItemsQueueProcessor.Added += (Action action) =>
             {
-                ColourConsole.WriteInfo($"Gatherer - queue action added.");
+                //ColourConsole.WriteInfo($"Gatherer - queue action added.");
             };
             newsItemsQueueProcessor.Processing += (Action action) =>
             {
@@ -66,8 +52,14 @@ namespace Information
                 UpdateInformation();
             };
 
-            GatherAllNews();
+            _ = GatherAllNewsAsync();
         }
+
+        //public async Task CleanAsync()
+        //{
+        //    var allNewsItems = newsManager.NewsItems;
+        //    await gathererInformation.CleanAsync(allNewsItems);
+        //}
 
         public void MarkNotInteresting(Guid id)
         {
@@ -88,31 +80,27 @@ namespace Information
             interestingItemCount = 0;
         }
 
-        private void GatherAllNews()
+        private async Task GatherAllNewsAsync()
         {
             ColourConsole.WriteInfo($"Gatherer - all new NewsItems, to be processed, started ...");
 
-            List<NewsItem> allNewsItems = new List<NewsItem>();
-            foreach (var source in newsManager.Sources)
-            {
-                List<NewsItem>? newsItems = source?.NewsItems;
-                if (newsItems != null)
-                    allNewsItems.AddRange(newsItems);
-            }
-
+            List<NewsItem> allNewsItems = newsManager.NewsItems;
 
             // Now check against our two (Interesting and Noninteresting) lists
             // and if there is something new, we can investigate it
             List<GathererInformationItem> combinedTwoList = new List<GathererInformationItem>();
-            combinedTwoList.AddRange(gathererInformation.InterestingItems);
-            combinedTwoList.AddRange(gathererInformation.NonInterestingItems);
+            using (InformationContext context = new InformationContext())
+            {
+                combinedTwoList.AddRange(context.InterestingItems);
+                combinedTwoList.AddRange(context.NonInterestingItems);
+            }
             List<GathererInformationItem> newItemsList = new List<GathererInformationItem>();
-            allNewsItems.RemoveAll(x => combinedTwoList.Find(y => y.Id == x.Id) != null);
+            allNewsItems.RemoveAll(x => combinedTwoList.Find(y => y.NewsItemId == x.Id) != null);
 
             // Now all everything we have never seen before to a queue for processing
             if (allNewsItems.Count > 0)
             {
-                _ = EnqueueNewsItems(allNewsItems);
+                await EnqueueNewsItems(allNewsItems);
             }
             else
             {
@@ -132,16 +120,16 @@ namespace Information
 
             if (info.Interesting)
             {
+
                 AnalysisConfidence highestConfidence = info.HighestConfidence;
                 if (highestConfidence >= MINIMUM_CONFIDENCE)
                 {
-
-                    ColourConsole.WriteInfo(
-                        $"--------------- Start Analysis --------------------------------------------------------------- ");
-
                     ColourConsole.WriteInfo(
                         $"Gatherer - found something interesting in NewsItem [{newsItem.Id}] " +
                         $"with Text:");
+
+                    ColourConsole.WriteInfo(
+                        $"--------------- Start Analysis [{newsItemsQueueProcessor.Count}] --------------------------------------------------------------- ");
 
                     ColourConsole.WriteNormal(info.Text);
                     string dateString = newsItem.PublishDate.ToString("dddd, dd MMMM yyyy hh:mm tt");
@@ -152,7 +140,7 @@ namespace Information
                     {
                         string companyInfo = $"{finding.Company.Name} ({finding.Company.Symbol}:{finding.Company.Exchange})";
                         string message =
-                                $"AnalysisInfo - Company " +
+                                $"Company " +
                                 $"[{companyInfo}] " +
                                 $"with Confidence [{finding.Confidence}] " +
                                 $"and with Rationale [{finding.Rationale}] " +
@@ -173,20 +161,20 @@ namespace Information
                     }
 
                     // We have least one finding with a confidence high enough
-                    gathererInformation.AddInteresingItem(info);
+                    await gathererInformation.AddInteresingItemAsync(info);
                     interestingItemCount++;
 
                     ColourConsole.WriteInfo(
-                        $"--------------- End Analysis ----------------------------------------------------------------- ");
+                        $"--------------- End Analysis [{newsItemsQueueProcessor.Count}] ----------------------------------------------------------------- ");
                 }
                 else
                 {
-                    gathererInformation.AddNoninteresingItem(info);
+                    await gathererInformation.AddNoninteresingItemAsync(info);
                 }
             }
             else
             {
-                gathererInformation.AddNoninteresingItem(info);
+                await gathererInformation.AddNoninteresingItemAsync(info);
             }
         }
 
@@ -232,7 +220,7 @@ namespace Information
             var task = Task.Run(async delegate
             {
                 // Start after 5 seconds unless cancelled
-                await Task.Delay(TimeSpan.FromSeconds(5), queueStartTokenSource.Token);
+                await Task.Delay(TimeSpan.FromSeconds(15), queueStartTokenSource.Token);
                 await newsItemsQueueProcessor.Run();
                 //ColourConsole.WriteWarning($"Gatherer(SetDelayedReaction) - (delayed) task is running.");
             }, queueStartTokenSource.Token);

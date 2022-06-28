@@ -1,14 +1,12 @@
-﻿using DataStorage;
-using Elements;
-using System.Text.Json.Serialization;
+﻿using Elements;
 
 namespace News
 {
 
-    public class SourceMonitor : IDataStoragable<SourceMonitorStore>
+    public class SourceMonitor
     {
-        public delegate void SourceMonitorNotify(string eventName);             // delegate
-        public delegate void FeedFreshArrival(List<NewsItem> freshNewsItems);   // delegate
+        public delegate void SourceMonitorNotify(Guid id, string eventName);            // delegate
+        public delegate void FeedFreshArrival(Guid id, List<NewsItem> freshNewsItems);  // delegate
 
         public event SourceMonitorNotify? Changed;                              // event
         public event FeedFreshArrival? FreshArrivals;                           // event
@@ -19,40 +17,35 @@ namespace News
             RUNNING
         }
 
+        public Guid Id { get; set; }
         public SourceMonitorStatus Status { get; set; }
         public TimeSpan PollingTimespan
         {
             get
             {
-                return Store.Data.PollingTimespan;
+                return pollingTimespan;
             }
             set
             {
                 if (value.TotalSeconds < Constants.MIN_POLLING_SECONDS) // <--- *** make constant ***
                 {
-                    ColourConsole.WriteWarning(
-                        $"Polling period can not be below {Constants.MIN_POLLING_SECONDS} seconds.");
+                    ColourConsole.WriteWarning($"SourceMonitor - Polling period can not be below {Constants.MIN_POLLING_SECONDS} seconds.");
                     TimeSpan newTimeSpan = new TimeSpan(0, 0, Constants.MIN_POLLING_SECONDS);
-                    if (newTimeSpan.TotalSeconds != Store.Data.PollingTimespan.TotalSeconds)
+                    if (newTimeSpan.TotalSeconds != pollingTimespan.TotalSeconds)
                     {
                         if (timer != null)
-                            timer.Interval = Store.Data.PollingTimespan.TotalMilliseconds;
-                        Store.Data.PollingTimespan = new TimeSpan(0, 0, Constants.MIN_POLLING_SECONDS);
-                        Store.Save();
-                        Changed?.Invoke("POLLINGTIMESPAN");
+                            timer.Interval = pollingTimespan.TotalMilliseconds;
+                        pollingTimespan = new TimeSpan(0, 0, Constants.MIN_POLLING_SECONDS);
                     }
                 }
                 else
                 {
                     if (timer != null)
                         timer.Interval = value.TotalMilliseconds;
-                    Store.Data.PollingTimespan = value;
-                    Store.Save();
-                    Changed?.Invoke("POLLINGTIMESPAN");
+                    pollingTimespan = value;
                 }
             }
         }
-        public NewsFeed Feed { get; private set; }
         public bool IsPolling
         {
             get
@@ -72,7 +65,6 @@ namespace News
                 {
                     Stop();
                 }
-                Changed?.Invoke("ISPOLLING");
             }
         }
         public DateTime LastPoll
@@ -84,40 +76,22 @@ namespace News
             set
             {
                 lastPoll = value;
-                Changed?.Invoke("LASTPOLL");
+                Changed?.Invoke(this.Id, "LASTPOLL");
             }
         }
 
-        [JsonIgnore]
-        public DataStorage<SourceMonitorStore>? Store { get; set; }
-
+        private TimeSpan pollingTimespan;
         private System.Timers.Timer? timer;
         private DateTime lastPoll;
+        private Func<NewsFeed> newsFeedFunc;
 
-        public SourceMonitor(Guid id, NewsFeed feed)
+        public SourceMonitor(Guid id, Func<NewsFeed> newsFeedFunc, TimeSpan pollingTimespan)
         {
-            this.Status = SourceMonitorStatus.IDLE;
-            this.Feed = feed;
-            this.Store = new DataStorage<SourceMonitorStore>(new SourceMonitorStore(id.ToString()));
+            this.Id = id;
+            this.pollingTimespan = pollingTimespan;
+            this.newsFeedFunc = newsFeedFunc;
             this.LastPoll = DateTime.MinValue;
-        }
-
-        public void Destroy()
-        {
-            Store.Destroy();
-        }
-
-        public void Load()
-        {
-            if (Store.Exists())
-                Store.Load();
-            else
-                Store.Save();
-        }
-
-        public void Save()
-        {
-            this.Store.Save();
+            this.Status = SourceMonitorStatus.IDLE;
         }
 
         public void Run()
@@ -126,7 +100,7 @@ namespace News
             if (timer == null)
             {
                 timer = new System.Timers.Timer();
-                timer.Interval = PollingTimespan.TotalMilliseconds;
+                timer.Interval = pollingTimespan.TotalMilliseconds;
                 timer.Elapsed += Poll;
             }
         }
@@ -166,13 +140,20 @@ namespace News
         private async Task RunFeed()
         {
             Status = SourceMonitorStatus.RUNNING;
-            List<NewsItem> freshNewsItems = await Feed.ProcessFeedAsync(); //////// Run first feed grab
+
+            NewsFeed feed = newsFeedFunc();
+
+            List<NewsItem> freshNewsItems = await feed.ProcessFeedAsync();
             LastPoll = DateTime.Now;
             Status = SourceMonitorStatus.IDLE;
 
             if (freshNewsItems.Count > 0)
             {
-                FreshArrivals?.Invoke(freshNewsItems);
+                // Only get items that are relevant (relatively recent)
+                DateTime oldesetDate = DateTime.Today - Constants.DEFAULT_CULL_PERIOD;
+                var recentNewsItems = freshNewsItems.FindAll(x => x.PublishDate > oldesetDate);
+
+                FreshArrivals?.Invoke(this.Id, recentNewsItems);
             }
         }
 

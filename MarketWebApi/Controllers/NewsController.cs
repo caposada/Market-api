@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using News;
+﻿using Elements;
+using Microsoft.AspNetCore.Mvc;
 
 namespace MarketWebApi.Controllers
 {
@@ -10,7 +10,6 @@ namespace MarketWebApi.Controllers
         public class NewsDetails
         {
             public int TotalNumberOfNewsItems { get; set; }
-            public List<string>? SourceIds { get; set; }
             public DateTimeOffset Latest { get; set; }
             public DateTimeOffset Earliest { get; set; }
             public int NumberOfRssFeeds { get; set; }
@@ -69,11 +68,11 @@ namespace MarketWebApi.Controllers
             this.marketApp = marketApp;
         }
 
-        [HttpPut("Clean")]
-        public void Clean()
-        {
-            marketApp.NewsManager.CleanAsync();
-        }
+        //[HttpPut("Clean")]
+        //public void Clean()
+        //{
+        //    marketApp.NewsManager.CleanAsync();
+        //}
 
         [HttpPut("CheckMissingFeeds")]
         public void CheckMissingFeeds()
@@ -90,10 +89,9 @@ namespace MarketWebApi.Controllers
         [HttpGet("Details")]
         public ActionResult<NewsDetails> GetNewsManagerDetails()
         {
-            var allNewsItems = marketApp.NewsManager.Sources.SelectMany(x => x.NewsItems).ToList();
+            var allNewsItems = marketApp.NewsManager.NewsItems;
             NewsDetails details = new NewsDetails()
             {
-                SourceIds = marketApp.NewsManager.Sources.OrderBy(x => x.FeedTitle).Select(x => x.Id.ToString()).ToList(),
                 TotalNumberOfNewsItems = allNewsItems.Count,
                 Earliest = allNewsItems.Count > 0 ? allNewsItems.Min(x => x.PublishDate) : DateTimeOffset.MinValue,
                 Latest = allNewsItems.Count > 0 ? allNewsItems.Max(x => x.PublishDate) : DateTimeOffset.MaxValue,
@@ -103,10 +101,18 @@ namespace MarketWebApi.Controllers
             return details;
         }
 
+        [HttpGet("Sources")]
+        public ActionResult<List<string>> GetNewsSources()
+        {
+            List<string>? sourceIds = marketApp.NewsManager.Sources.OrderBy(x => x.FeedTitle).Select(x => x.Id.ToString()).ToList();
+            return sourceIds;
+        }
+
         [HttpGet("{id}/Details")]
         public ActionResult<NewsSourceDetails> GetNewsSourceDetails(string id)
         {
-            var source = marketApp.NewsManager.GetSource(Guid.Parse(id));
+            Guid guid = Guid.Parse(id);
+            var source = marketApp.NewsManager.GetSource(guid);
             var sourceMonitor = source?.SourceMonitor;
             NewsSourceDetails details = new NewsSourceDetails()
             {
@@ -115,8 +121,8 @@ namespace MarketWebApi.Controllers
                 Url = source?.FeedUrl,
                 FeedType = source?.FeedType,
                 Timezone = source?.Timezone,
-                NewsItems_Count = source?.NewsItems?.Count,
-                NewsItems_LastPublished = source?.LastPublished,
+                NewsItems_Count = marketApp.NewsManager.GetNewsItemsCount(guid),
+                NewsItems_LastPublished = marketApp.NewsManager.GetNewsItemsLastPublish(guid),
                 IsPolling = sourceMonitor?.IsPolling,
                 LastPoll = sourceMonitor?.LastPoll,
                 PollingTimespan = sourceMonitor?.PollingTimespan
@@ -127,9 +133,11 @@ namespace MarketWebApi.Controllers
         [HttpGet("{id}/NewsItems")]
         public ActionResult<List<NewsItem>?> GetNewsItems(string id)
         {
-            var source = marketApp.NewsManager.GetSource(Guid.Parse(id));
+            Guid guid = Guid.Parse(id);
+            var source = marketApp.NewsManager.GetSource(guid);
+            var first100 = marketApp.NewsManager.GetNewsItems(guid).Take(100);
             List<NewsItem> newsItems = new List<NewsItem>();
-            foreach (var newsItem in source?.NewsItems)
+            foreach (var newsItem in first100)
             {
                 newsItems.Add(new NewsItem()
                 {
@@ -149,18 +157,20 @@ namespace MarketWebApi.Controllers
         {
             try
             {
-                var source = marketApp.NewsManager.GetSource(Guid.Parse(id));
-                var sourceMonitor = source?.SourceMonitor;
+                Guid guid = Guid.Parse(id);
+                var source = marketApp.NewsManager.GetSource(guid);
 
-                if (sourceMonitor != null)
+                if (details.IsPolling != null)
                 {
-                    if (details.IsPolling != null)
-                        sourceMonitor.IsPolling = (bool)details.IsPolling;
-
-                    if (details.PollingTimespan != null)
-                        sourceMonitor.PollingTimespan = sourceMonitor.PollingTimespan.Add((TimeSpan)details.PollingTimespan);
+                    marketApp.NewsManager.SetPolling(guid, (bool)details.IsPolling);
                 }
 
+                if (details.PollingTimespan != null)
+                {
+                    marketApp.NewsManager.SetPollingTimespan(guid, (TimeSpan)details.PollingTimespan);
+                }
+
+                var sourceMonitor = source?.SourceMonitor;
                 NewsSourceDetails newDetails = new NewsSourceDetails()
                 {
                     SourceId = id,
@@ -168,8 +178,8 @@ namespace MarketWebApi.Controllers
                     Url = source?.FeedUrl,
                     FeedType = source?.FeedType,
                     Timezone = source?.Timezone,
-                    NewsItems_Count = source?.NewsItems?.Count,
-                    NewsItems_LastPublished = source?.LastPublished,
+                    NewsItems_Count = marketApp.NewsManager.GetNewsItemsCount(guid),
+                    NewsItems_LastPublished = marketApp.NewsManager.GetNewsItemsLastPublish(guid),
                     IsPolling = sourceMonitor?.IsPolling,
                     LastPoll = sourceMonitor?.LastPoll,
                     PollingTimespan = sourceMonitor?.PollingTimespan
@@ -187,18 +197,16 @@ namespace MarketWebApi.Controllers
         {
             try
             {
-                var source = marketApp.NewsManager.GetSource(Guid.Parse(id));
-                var sourceMonitor = source?.SourceMonitor;
 
-                if (sourceMonitor != null)
+                Guid guid = Guid.Parse(id);
+
+                if (details.Timezone != null)
                 {
-                    if (details.Timezone != null)
-                    {
-                        source.Timezone = details.Timezone;
-                        marketApp.NewsManager.SaveChanges();
-                    }
+                    marketApp.NewsManager.SetTimezone(guid, details.Timezone);
                 }
 
+                var source = marketApp.NewsManager.GetSource(Guid.Parse(id));
+                var sourceMonitor = source?.SourceMonitor;
                 NewsSourceDetails newDetails = new NewsSourceDetails()
                 {
                     SourceId = id,
@@ -206,8 +214,8 @@ namespace MarketWebApi.Controllers
                     Url = source?.FeedUrl,
                     FeedType = source?.FeedType,
                     Timezone = source?.Timezone,
-                    NewsItems_Count = source?.NewsItems?.Count,
-                    NewsItems_LastPublished = source?.LastPublished,
+                    NewsItems_Count = marketApp.NewsManager.GetNewsItemsCount(guid),
+                    NewsItems_LastPublished = marketApp.NewsManager.GetNewsItemsLastPublish(guid),
                     IsPolling = sourceMonitor?.IsPolling,
                     LastPoll = sourceMonitor?.LastPoll,
                     PollingTimespan = sourceMonitor?.PollingTimespan

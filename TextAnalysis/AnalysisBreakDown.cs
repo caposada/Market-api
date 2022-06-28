@@ -1,9 +1,17 @@
 ﻿using Catalyst;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TextAnalysis
 {
     public class AnalysisBreakDown
     {
+        public class Span : List<Token>
+        {
+
+            //public 
+
+        }
+
         public class Token
         {
             public string Text { get; }
@@ -29,15 +37,7 @@ namespace TextAnalysis
             }
         }
 
-        public class Span : List<Token>
-        {
-
-            //public 
-
-        }
-
-        public List<Span> Spans { get; }
-
+        [NotMapped]
         public List<Token> AllTokens
         {
             get
@@ -45,6 +45,8 @@ namespace TextAnalysis
                 return Spans.SelectMany(span => span).ToList<Token>();
             }
         }
+
+        public List<Span> Spans { get; }
 
         public AnalysisBreakDown(List<Span> spans)
         {

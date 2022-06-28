@@ -1,49 +1,25 @@
-﻿using DataStorage;
-using Elements;
-using System.Text.Json.Serialization;
+﻿using Configuration;
 
 namespace StockManager
 {
-
     public partial class MarketData
     {
-        public class MarketDataSettings : IDataStoragable<MarketDataSettingsStore>
-        {     
-            public string? ApiKey
-            {
-                get
-                {
-                    return Store.Data.AlphaVantage_ApiKey;
-                }
-            }
-            public int? MaxHitsPerMinute
-            {
-                get
-                {
-                    return Store.Data.AlphaVantage_MaxHitsPerMinute;
-                }
-            }
-            public int? MaxHitsPerDay
-            {
-                get
-                {
-                    return Store.Data.AlphaVantage_MaxHitsPerDay;
-                }
-            }
-
-            [JsonIgnore]
-            public DataStorage<MarketDataSettingsStore>? Store { get; set; }
+        public class MarketDataSettings
+        {
+            public string ApiKey { get; set; }
+            public int MaxHitsPerMinute { get; set; }
+            public int MaxHitsPerDay { get; set; }
 
             public MarketDataSettings()
             {
-                this.Store = new DataStorage<MarketDataSettingsStore>(new MarketDataSettingsStore());
-                this.Store.Load();
+                using (ConfigurationContext context = new ConfigurationContext())
+                {
+                    ApiKey = context.Settings.Where(x => x.Name == "AlphaVantage_ApiKey").First().Value;
+                    MaxHitsPerMinute = int.Parse(context.Settings.Where(x => x.Name == "AlphaVantage_MaxHitsPerMinute").First().Value);
+                    MaxHitsPerDay = int.Parse(context.Settings.Where(x => x.Name == "AlphaVantage_MaxHitsPerDay").First().Value);
+                }
             }
 
-            public void Destroy()
-            {
-                throw new NotImplementedException();
-            }
         }
     }
 }

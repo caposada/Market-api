@@ -1,14 +1,12 @@
 ﻿using CsvHelper;
-using DataStorage;
 using Elements;
 using StockManager;
 using System.Globalization;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace Companies
 {
-    public class CompaniesList : IDataStoragable<CompaniesListStore>
+    public class CompaniesList
     {
         internal class Csv
         {
@@ -41,23 +39,26 @@ namespace Companies
 
         private const int MIN_COMPANY_NAME_SIZE = 4;
 
-        public List<SimpleCompany>? Companies
+        public List<SimpleCompany> Companies
         {
             get
             {
-                return Store.Data.Companies;
+                using (CompaniesContext context = new CompaniesContext())
+                {
+                    return context.Companies.ToList();
+                }
             }
         }
         public bool Loaded
         {
             get
             {
-                return Store != null && Store.Data.Companies != null && Store.Data.Companies.Count > 0;
+                using (CompaniesContext context = new CompaniesContext())
+                {
+                    return context.Companies != null && context.Companies.ToList().Count > 0;
+                }
             }
         }
-
-        [JsonIgnore]
-        public DataStorage<CompaniesListStore>? Store { get; set; }
 
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         private MarketData marketData;
@@ -65,21 +66,17 @@ namespace Companies
         public CompaniesList(MarketData marketData)
         {
             this.marketData = marketData;
-            this.Store = new DataStorage<CompaniesListStore>(new CompaniesListStore());
         }
 
         public async Task LoadAsync()
         {
-            ColourConsole.WriteInfo($"Loading CompanyList ...");
-
-            // Load data file
-            this.Store.Load();
+            ColourConsole.WriteInfo($"CompaniesList - Loading CompanyList ...");
 
             if (!Loaded)
             {
                 // Data file doesn't exist!
 
-                ColourConsole.WriteInfo($"Getting fresh CompanyList from market ...");
+                ColourConsole.WriteInfo($"CompaniesList - Getting fresh CompanyList from market ...");
 
                 // Go get the data from the internet
                 var marketDataRequest = new MarketDataRequest<CompanyListingsRequest, string>(
@@ -91,30 +88,34 @@ namespace Companies
                     // Extract data from CSV data dowloaded 
                     if (marketDataRequest.Resulting != null)
                     {
-                        Store.Data.Companies = ExtractDataFromDataString(marketDataRequest.Resulting);
+                        using (CompaniesContext context = new CompaniesContext())
+                        {
+                            context.Companies.AddRange(ExtractDataFromDataString(marketDataRequest.Resulting));
+                            context.SaveChanges();
+                        }
 
-                        // Save to data file
-                        Store.Save();
-
-                        ColourConsole.WriteInfo($"... CompanyList from market retrieved and saved to data file.");
+                        ColourConsole.WriteInfo($"CompaniesList - ... CompanyList from market retrieved and saved to data file.");
                     }
                 }
             }
 
-            ColourConsole.WriteInfo($"... CompanyList loaded.");
+            ColourConsole.WriteInfo($"CompaniesList - ... CompanyList loaded.");
         }
 
         public List<SimpleCompany>? GetCompanies()
         {
-            return Store.Data.Companies;
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Companies.ToList();
+            }
         }
 
         public List<string> GetFlatList()
         {
             List<string> flatlist = new List<string>();
-            if (Store.Data.Companies != null)
+            using (CompaniesContext context = new CompaniesContext())
             {
-                foreach (var company in Store.Data.Companies)
+                foreach (var company in context.Companies)
                 {
                     flatlist.Add(company.LongName);
 
@@ -134,46 +135,47 @@ namespace Companies
 
         public SimpleCompany? GetCompany(string text)
         {
-            SimpleCompany? company = null;
-            if (Store.Data.Companies != null)
+            using (CompaniesContext context = new CompaniesContext())
             {
-                company = Store.Data.Companies.Find(
-                    x => (x.Name != null && x.Name.Equals(text, StringComparison.CurrentCultureIgnoreCase)) || x.Aliases.Contains(text) || x.Symbol == text);
+                return context.Companies.ToList().Find(
+                    x => (x.Name.Equals(text, StringComparison.CurrentCultureIgnoreCase)) || x.Aliases.Contains(text) || x.Symbol == text);
             }
-            return company;
         }
 
         public List<SimpleCompany> GetCompaniesFromFragment(string text)
         {
-            if (Store.Data.Companies != null)
+            using (CompaniesContext context = new CompaniesContext())
             {
                 List<SimpleCompany> companies = new List<SimpleCompany>();
-                companies.AddRange(Store.Data.Companies.FindAll(x => x.Name != null && x.Name.Contains(text)));
-                companies.AddRange(Store.Data.Companies.FindAll(x => x.Aliases.Contains(text)));
+                var allCompanies = context.Companies.ToList();
+                companies.AddRange(allCompanies.FindAll(x => x.Name != null && x.Name.Contains(text)));
+                companies.AddRange(allCompanies.FindAll(x => x.Aliases.Contains(text)));
                 return companies;
             }
-            return new List<SimpleCompany>();
         }
 
         public SimpleCompany? GetCompanyBySymbol(string symbol)
         {
-            if (Store.Data.Companies != null)
-                return Store.Data.Companies.Find(x => x.Symbol == symbol);
-            return null;
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Companies.Where(x => x.Symbol == symbol).FirstOrDefault();
+            }
         }
 
         public SimpleCompany? GetCompanyByName(string text)
         {
-            if (Store.Data.Companies != null)
-                return Store.Data.Companies.Find(x => x.Name == text);
-            return null;
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Companies.Where(x => x.Name == text).FirstOrDefault();
+            }
         }
 
         public List<SimpleCompany>? GetCompanies(Regex pattern)
         {
-            if (Store.Data.Companies != null)
-                return Store.Data.Companies.Where(x => x.Name != null && pattern.IsMatch(x.Name)).ToList();
-            return null;
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Companies.Where(x => x.Name != null && pattern.IsMatch(x.Name)).ToList();
+            }
         }
 
         private static List<SimpleCompany>? ExtractDataFromDataString(string marketDataString)
@@ -197,12 +199,13 @@ namespace Companies
                     {
                         if (record.symbol != "" && record.name != "")
                         {
+                            string exchange = record.exchange.Replace(' ', '_');
                             SimpleCompany simpleCompany = new SimpleCompany(
                                 record.symbol,
                                 record.name,
-                                record.exchange,
-                                record.assetType,
-                                record.ipoDate,
+                                (Exchanges)Enum.Parse<Exchanges>(exchange),
+                                (AssetTypes)Enum.Parse<AssetTypes>(record.assetType.ToUpper()),
+                                DateTime.Parse(record.ipoDate),
                                 record.status);
                             companies.Add(simpleCompany);
                         }
@@ -238,9 +241,5 @@ namespace Companies
             return firstWord;
         }
 
-        public void Destroy()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

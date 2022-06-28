@@ -1,5 +1,4 @@
-﻿using Elements;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -53,14 +52,14 @@ namespace MarketWebApi.Controllers
 
         private async void MarketApp_EchoMessage(object obj)
         {
-            ColourConsole.WriteLine(DateTime.Now + " : MarketApp_EchoMessage", ConsoleColor.White, ConsoleColor.DarkGray);
+            //ColourConsole.WriteLine("WsController - MarketApp_EchoMessage", ConsoleColor.White, ConsoleColor.DarkGray);
             string jsonString = JsonSerializer.Serialize((WebSocketMessage)obj);
             await Send(jsonString);
         }
 
         private async void NewsManager_FreshArrivals(Guid id, List<Elements.NewsItem> freshItems)
         {
-            string title = marketApp.NewsManager.GetSource(id).SourceMonitor.Feed.Title;
+            string title = marketApp.NewsManager.GetSource(id).FeedTitle;
             string jsonString = JsonSerializer.Serialize(new WebSocketMessage("NewsManager", "FreshArrivals")
             {
                 Id = id.ToString(),
@@ -72,7 +71,7 @@ namespace MarketWebApi.Controllers
 
         private async void NewsManager_SourceMonitorChanged(Guid id, string eventName)
         {
-            string title = marketApp.NewsManager.GetSource(id).SourceMonitor.Feed.Title;
+            string title = marketApp.NewsManager.GetSource(id).FeedTitle;
             string jsonString = JsonSerializer.Serialize(new WebSocketMessage("NewsManager", "SourceMonitorChanged")
             {
                 Id = id.ToString(),
@@ -83,13 +82,14 @@ namespace MarketWebApi.Controllers
 
         private async void Gatherer_InterestedItemsChanged(int numberOfInterestingItems)
         {
-            ColourConsole.WriteLine(DateTime.Now + " : Gatherer_InterestedItemsAdded", ConsoleColor.White, ConsoleColor.DarkGray);
+            //ColourConsole.WriteLine("WsController - Gatherer_InterestedItemsAdded", ConsoleColor.White, ConsoleColor.DarkGray);
             string jsonString = JsonSerializer.Serialize(new WebSocketMessage("Gatherer", "InterestedItemsChanged")
             {
                 Data = numberOfInterestingItems.ToString()
             });
             await Send(jsonString);
         }
+
         private async void GathererInformation_InformationChanged()
         {
             string jsonString = JsonSerializer.Serialize(new WebSocketMessage("GathererInformation", "InformationChanged")

@@ -13,6 +13,22 @@ namespace Elements
         public decimal Change { get; set; }
         public decimal ChangePercent { get; set; }
 
+        public DataPoint()
+        {
+        }
+
+        public DataPoint(DateTime time, decimal openingPrice, decimal closingPrice, decimal highestPrice, decimal lowestPrice, long volume, decimal change, decimal changePercent)
+        {
+            Time = time;
+            OpeningPrice = openingPrice;
+            ClosingPrice = closingPrice;
+            HighestPrice = highestPrice;
+            LowestPrice = lowestPrice;
+            Volume = volume;
+            Change = change;
+            ChangePercent = changePercent;
+        }
+
         public DataPoint(StockDataPoint stockDataPoint)
         {
             this.Time = stockDataPoint.Time;

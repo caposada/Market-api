@@ -1,15 +1,6 @@
-﻿using DataStorage;
-using Elements;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-
-namespace StockManager
+﻿namespace StockManager
 {
-    public class MarketDataLogger : IDataStoragable<MarketDataLoggerStore>
+    public class MarketDataLogger
     {
         public int TodaysCount
         {
@@ -19,42 +10,49 @@ namespace StockManager
             }
         }
 
-        [JsonIgnore]
-        public DataStorage<MarketDataLoggerStore>? Store { get; set; }
-
         public MarketDataLogger()
         {
-            this.Store = new DataStorage<MarketDataLoggerStore>(new MarketDataLoggerStore());
-            this.Store.Load();
         }
 
         public void IncrementCount()
         {
-            var requestRecord = GetTodaysRequestRecord();
-            requestRecord.Count++;
-            Store.Save();
-        }
-
-        private MarketDataLoggerStore.RequestRecord GetTodaysRequestRecord()
-        {
-            DateTime today = DateTime.Today;
-            var requestRecord = Store.Data.RequestRecords.Find(x => x.Date == today);
-            if (requestRecord == null)
+            using (StockMarketContext context = new StockMarketContext())
             {
-                requestRecord = new MarketDataLoggerStore.RequestRecord()
+                DateTime today = DateTime.Today;
+                var requestRecord = context.RequestRecords.Where(x => x.Date == today).FirstOrDefault();
+                if (requestRecord == null)
                 {
-                    Count = 0,
-                    Date = today
-                };
-                Store.Data.RequestRecords.Add(requestRecord);
-                Store.Save();
+                    requestRecord = new RequestRecord()
+                    {
+                        Count = 0,
+                        Date = today
+                    };
+                    context.RequestRecords.Add(requestRecord);
+                }
+                requestRecord.Count++;
+                context.SaveChanges();
             }
-            return requestRecord;
         }
 
-        public void Destroy()
+        private RequestRecord GetTodaysRequestRecord()
         {
-            throw new NotImplementedException();
+            using (StockMarketContext context = new StockMarketContext())
+            {
+                DateTime today = DateTime.Today;
+                var requestRecord = context.RequestRecords.Where(x => x.Date == today).FirstOrDefault();
+                if (requestRecord == null)
+                {
+                    requestRecord = new RequestRecord()
+                    {
+                        Count = 0,
+                        Date = today
+                    };
+                    context.RequestRecords.Add(requestRecord);
+                    context.SaveChanges();
+                }
+                return requestRecord;
+            }
         }
+
     }
 }

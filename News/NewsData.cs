@@ -1,86 +1,92 @@
-﻿using DataStorage;
-using Elements;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+﻿using Elements;
 
 namespace News
 {
-
-    public class NewsData : IDataStoragable<NewsDataStore>
+    public class NewsData
     {
 
         public List<NewsItem> NewsItems
         {
             get
             {
-                return this.Store.Data.NewsItems;
+                using (NewsContext context = new NewsContext())
+                {
+                    return context.NewsItems.ToList();
+                }
             }
         }
         public DateTimeOffset LastPublished
         {
             get
             {
-                return NewsItems.Count > 0 ? NewsItems[0].PublishDate : DateTimeOffset.MinValue;
+                using (NewsContext context = new NewsContext())
+                {
+                    var newsItems = context.NewsItems.ToList();
+                    return newsItems.Count > 0 ? newsItems[0].PublishDate : DateTimeOffset.MinValue;
+                }
             }
         }
 
-        [JsonIgnore]
-        public DataStorage<NewsDataStore>? Store { get; set; }
-
-        public NewsData(Guid id)
+        public NewsData()
         {
-            this.Store = new DataStorage<NewsDataStore>(new NewsDataStore(id.ToString()));
-            this.Store.Load();
         }
 
-        public void Destroy()
+        //public async Task CleanAsync()
+        //{
+        //    using (NewsContext context = new NewsContext())
+        //    {
+        //        DateTime oldesetDate = DateTime.Today - Constants.DEFAULT_CULL_PERIOD;
+        //        var old = context.NewsItems.Where(x => x.SourceId == Id && x.PublishDate <= oldesetDate).ToList();
+        //        if (old.Count > 0)
+        //        {
+        //            context.NewsItems.RemoveRange(old);
+        //            await context.SaveChangesAsync();
+        //        }
+        //    }
+        //}
+
+        public async Task AddAsync(List<NewsItem> newNewsItems)
         {
-            Store.Destroy();
+            using (NewsContext context = new NewsContext())
+            {
+                context.NewsItems.AddRange(newNewsItems);
+                await context.SaveChangesAsync();
+            }
         }
 
-        public void Add(NewsItem newNewsItem)
-        {
-            Store.Data.Add(newNewsItem);
-            Store.Save();
-        }
-
-        public void Add(List<NewsItem> newNewsItems)
-        {
-            Store.Data.Add(newNewsItems);
-            Store.Save();
-        }
-
-        public List<NewsItem> ProcessFreshItems(List<NewsItem> freshNewsItems)
+        public List<NewsItem> ProcessFreshItemsAsync(List<NewsItem> freshNewsItems)
         {
             List<NewsItem> brandNewNewsItems = new List<NewsItem>();
 
-            foreach (var freshNewsItem in freshNewsItems)
+            using (NewsContext context = new NewsContext())
             {
-                bool hasIdAlready = NewsItems.Any(x => x.Id == freshNewsItem.Id);
-                bool hasTextAlready = NewsItems.Any(x => x.Text == freshNewsItem.Text);
-
-                if (!hasIdAlready && !hasTextAlready)
+                foreach (var freshNewsItem in freshNewsItems)
                 {
-                    brandNewNewsItems.Add(freshNewsItem);
+                    bool hasIdAlready = context.NewsItems.Any(x => x.Id == freshNewsItem.Id);
+                    bool hasTextAlready = context.NewsItems.Any(x => x.Text == freshNewsItem.Text);
+
+                    if (!hasIdAlready && !hasTextAlready)
+                    {
+                        brandNewNewsItems.Add(freshNewsItem);
+                    }
                 }
             }
 
             if (brandNewNewsItems.Count > 0)
             {
-                Add(brandNewNewsItems);
+                _ = AddAsync(brandNewNewsItems);
             }
 
             return brandNewNewsItems;
         }
 
-        public void ExpungeAllNewsItems()
+        public async Task ExpungeAllNewsItemsAsync()
         {
-            Store.Data.ExpungeAll();
-            Store.Save();
+            using (NewsContext context = new NewsContext())
+            {
+                context.NewsItems.RemoveRange(context.NewsItems);
+                await context.SaveChangesAsync();
+            }
         }
     }
 }

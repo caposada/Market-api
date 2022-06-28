@@ -1,59 +1,58 @@
-﻿using DataStorage;
-using Elements;
-using System.Text.Json.Serialization;
+﻿using Elements;
 
 namespace Companies
 {
-    public class CompaniesAliasList : IDataStoragable<CompaniesAliasListStore>
-    {        
-
-        public List<CompanyAlias> Aliases
-        {
-            get
-            {
-                return Store.Data.Aliases;
-            }
-        }
-
-        [JsonIgnore]
-        public DataStorage<CompaniesAliasListStore>? Store { get; set; }
+    public class CompaniesAliasList
+    {
 
         public CompaniesAliasList()
         {
-            this.Store = new DataStorage<CompaniesAliasListStore>(new CompaniesAliasListStore());
-            this.Store.Load();
         }
 
-        public CompanyAlias SetAlias(string symbol, List<string> aliases)
+        public void SetAlias(string symbol, List<string> aliases)
         {
-            CompanyAlias? alias = Store.Data.Aliases.Find(x => x.Symbol == symbol);
-            if (alias != null)
+            using (CompaniesContext context = new CompaniesContext())
             {
-                alias.Names = aliases;
-                this.Store.Save();
+                // Remove deleted entries
+                var old = context.Aliases.Where(x => x.Symbol == symbol && !aliases.Contains(x.Name));
+                context.Aliases.RemoveRange(old);
+
+                // Add any new
+                foreach (string newAlias in aliases)
+                {
+                    if (!context.Aliases.Any(x => x.Symbol == symbol && x.Name == newAlias))
+                    {
+                        context.Add(new CompanyAlias(symbol, newAlias));
+                    }
+                }
+
+                context.SaveChanges();
             }
-            else
-            {
-                alias = new CompanyAlias(symbol, aliases);
-                this.Store.Data.Aliases.Add(alias);
-                this.Store.Save();
-            }
-            return alias;
         }
 
-        public List<string> GetAllAliases()
+        public List<CompanyAlias> GetAliases()
         {
-            List<string> aliases = new List<string>();
-            foreach (var alias in Store.Data.Aliases)
+            using (CompaniesContext context = new CompaniesContext())
             {
-                aliases.AddRange(alias.Names);
+                return context.Aliases.ToList();
             }
-            return aliases;
         }
 
-        public void Destroy()
+        public List<string> GetNames(string symbol)
         {
-            throw new NotImplementedException();
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Aliases.Where(x => x.Symbol == symbol).Select(x => x.Name).ToList();
+            }
         }
+
+        public List<string> GetAllAliasNames()
+        {
+            using (CompaniesContext context = new CompaniesContext())
+            {
+                return context.Aliases.Select(x => x.Name).ToList();
+            }
+        }
+
     }
 }

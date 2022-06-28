@@ -2,7 +2,7 @@
 {
     public class MarketDataRequest
     {
-        public const int MAX_ERRORS = 10;
+        public const int MAX_ERRORS = 5;
         private int errorCount = 0;
 
         public MarketDataRequestStatus MarketDataRequestStatus { get; set; }
@@ -47,4 +47,5 @@
         }
 
     }
+
 }

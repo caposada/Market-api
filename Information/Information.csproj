@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DataStorage\DataStorage.csproj" />
     <ProjectReference Include="..\Elements\Elements.csproj" />
     <ProjectReference Include="..\News\News.csproj" />
     <ProjectReference Include="..\TextAnalysis\TextAnalysis.csproj" />

@@ -115,7 +115,7 @@ namespace TextAnalysis.Tests
                 2,
                 analyser.Info.Findings.Count,
                 "Should have 2 finding - one HIGH (Twitter) and one MEDIUM (British American Tobacco because of 'British') and not DOW (NOW) - 'LISTEN NOW:' is garbage");
-            
+
             _ = analyser.Analyse(new NewsItem(
                 "123",
                 DateTimeOffset.Now,
@@ -124,7 +124,7 @@ namespace TextAnalysis.Tests
             Assert.AreEqual(
                 1,
                 analyser.Info.Findings.Count,
-                "Should have 1 finding - one HIGH (Dow) and not DOW (NOW) - 'LISTEN NOW:' is garbage");            
+                "Should have 1 finding - one HIGH (Dow) and not DOW (NOW) - 'LISTEN NOW:' is garbage");
 
             _ = analyser.Analyse(new NewsItem(
                 "123",
@@ -167,7 +167,7 @@ namespace TextAnalysis.Tests
                 "Should have 0 finding - Nestle not in NYSE or NASDAQ markets");
 
 
-            
+
 
         }
 

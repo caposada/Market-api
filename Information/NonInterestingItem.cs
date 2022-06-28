@@ -1,20 +1,12 @@
-﻿using System.Text.Json.Serialization;
-using TextAnalysis;
-
-namespace Information
+﻿namespace Information
 {
     public class NonInterestingItem : GathererInformationItem
     {
 
-        [JsonConstructorAttribute]
-        public NonInterestingItem(Guid id, Guid sourceId, DateTime timestamp)
-            : base(id, sourceId, timestamp)
+        public NonInterestingItem(Guid newsItemId, Guid sourceId, DateTime timestamp, string text, DateTimeOffset publishDate)
+            : base(newsItemId, sourceId, timestamp, text, publishDate)
         {
         }
 
-        public NonInterestingItem(AnalysisInfo info)
-            : base(info.NewsItem.Id, info.NewsItem.SourceId, DateTime.Now)
-        {
-        }
     }
 }
