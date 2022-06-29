@@ -59,14 +59,14 @@ namespace TextAnalysis
         public void AddFinding(AnalysisFinding finding)
         {
             // Check we haven't already added this company
-            if (finding.Company != null && findings.Find(x => x.Company == finding.Company) == null)
+            if (finding.Company != null && !findings.Any(x => x.Company.Symbol == finding.Company.Symbol))
             {
                 findings.Add(finding);
             }
         }
 
         public void AddCompanyFinding(
-            SimpleCompany company,
+            BasicCompany company,
             AnalysisConfidence confidence,
             AnalysisRationale rationale,
             List<AnalysisBreakDown.Token> tokens)
